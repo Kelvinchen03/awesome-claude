@@ -35,6 +35,10 @@ describe("submission automation workflows", () => {
 
     expect(source).toContain("pull_request_target:");
     expect(source).toContain("Checkout base repository");
+    expect(source).toContain("ref: ${{ github.event.pull_request.base.ref }}");
+    expect(source).not.toContain(
+      "ref: ${{ github.event.pull_request.base.sha }}",
+    );
     expect(source).toContain("github.rest.repos.getContent");
     expect(source).toContain("pr.head.sha");
     expect(source).toContain("sourceType");

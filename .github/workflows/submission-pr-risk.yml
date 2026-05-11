@@ -32,7 +32,7 @@ jobs:
       - name: Checkout base repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@4f4305e1fe60ad818b8ae6fc4a697cc47eab0b2d
