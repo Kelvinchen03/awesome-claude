@@ -50,6 +50,19 @@ describe("submission automation workflows", () => {
     expect(source).toContain("pr.head.sha");
     expect(source).toContain("read as data only");
     expect(source).toContain("never checks out PR code");
+    expect(source).toContain("### Contributor");
+    expect(source).toContain("### Contribution");
+    expect(source).toContain("contributorAnalysis");
+    expect(source).toContain("contributionAnalysis");
+    expect(source).toContain("contributorAnalysisTarget");
+    expect(source).toContain('contributorSource !== "submission_issue_author"');
+    expect(source).toContain("analysisTarget.fallback");
+    expect(source).toContain("analysis.accountAgeDays < 30");
+    expect(source).not.toContain("} else if (ageDays < 30)");
+    expect(source).not.toContain(
+      "report.effectiveContributor || pullRequestActor || pr.user",
+    );
+    expect(source).toContain("github.rest.repos.get");
     expect(source).toContain("sourceType");
     expect(source).toContain("automation_import");
     expect(source).toContain("submissionIssueContributors");
@@ -277,10 +290,14 @@ diff --git a/README.md b/README.md
     );
 
     expect(source).toContain(
-      "| Issue | Status | Security | Age | Category | Slug | Action | Notes |",
+      "| Issue | Status | Security | Source | Contributor | Age | Category | Slug | Action | Notes |",
     );
+    expect(source).toContain("entry.riskSummary");
     expect(source).toContain("entry.riskFlags");
     expect(source).toContain("entry.riskTier");
+    expect(source).toContain("entry.sourceState");
+    expect(source).toContain("entry.contributorReview");
+    expect(source).toContain("entry.maintainerActions");
   });
 
   it("keeps stale submission automation review-only and label-scoped", () => {
