@@ -1,9 +1,21 @@
 {
   "schemaVersion": 2,
   "kind": "registry-changelog",
-  "generatedAt": "2026-05-09T00:00:00.000Z",
-  "count": 384,
+  "generatedAt": "2026-05-10T00:00:00.000Z",
+  "count": 385,
   "entries": [
+    {
+      "key": "mcp:packrift-mcp-server",
+      "type": "added",
+      "category": "mcp",
+      "slug": "packrift-mcp-server",
+      "title": "Packrift MCP Server",
+      "dateAdded": "2026-05-10",
+      "canonicalUrl": "https://heyclau.de/mcp/packrift-mcp-server",
+      "llmsUrl": "https://heyclau.de/data/llms/mcp/packrift-mcp-server.txt",
+      "apiUrl": "https://heyclau.de/api/registry/entries/mcp/packrift-mcp-server",
+      "artifactHash": "69f2bd73e10675f81cf6a50a9866c388101ce5c44bc9a1cb0809c654537657c1"
+    },
     {
       "key": "mcp:xquik-mcp-server",
       "type": "added",
@@ -4614,5 +4626,5 @@
     }
   ],
   "signatureAlgorithm": "sha256",
-  "signature": "06409c64585ecfdc9fc33395c5df552272488b32ce078b5b104594cd5af5829e"
+  "signature": "234087fa70374f11eecfcaf30e7cd0dff2beef7223fc57954f144d5001dc2b23"
 }
