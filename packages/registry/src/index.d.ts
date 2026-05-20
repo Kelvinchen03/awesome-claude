@@ -756,6 +756,7 @@ export type SearchDocument = {
   brandAssetSource?: string;
   dateAdded: string;
   installable: boolean;
+  downloadUrl?: string;
   downloadTrust: DownloadTrust;
   verificationStatus: string;
   platforms?: string[];
