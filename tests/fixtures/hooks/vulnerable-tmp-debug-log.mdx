@@ -1,0 +1,25 @@
+---
+title: Vulnerable Hook - Predictable Tmp Debug Log
+slug: vulnerable-tmp-debug-log
+category: hooks
+description: Hook with predictable /tmp/ debug logs that could leak sensitive output
+cardDescription: Demonstrates predictable tmp log vulnerability
+trigger: PostToolUse
+scriptLanguage: bash
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook writes debug output to a predictable /tmp/ location
+  # which could leak sensitive hook output to other users
+  
+  DEBUG_LOG="/tmp/claude-hook-debug.log"
+  
+  echo "Processing hook at $(date)" >> "$DEBUG_LOG"
+  echo "Current directory: $(pwd)" >> "$DEBUG_LOG"
+  echo "Environment variables:" >> "$DEBUG_LOG"
+  env >> "$DEBUG_LOG"
+  
+  # Perform some operation
+  echo "Hook completed" >> "$DEBUG_LOG"
+---
+
+This hook demonstrates a vulnerability where debug logs are written to a predictable shared `/tmp/` location.

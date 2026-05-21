@@ -1,0 +1,28 @@
+---
+title: Safe Hook - Secure Tmp Usage
+slug: safe-secure-tmp-usage
+category: hooks
+description: Hook with secure temporary file handling using mktemp
+cardDescription: Demonstrates secure tmp file practices
+trigger: PostToolUse
+scriptLanguage: bash
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook demonstrates secure temporary file handling
+  
+  # Use mktemp for secure temporary file creation
+  DEBUG_LOG=$(mktemp /tmp/claude-hook.XXXXXX)
+  
+  # Ensure cleanup on exit
+  trap 'rm -f "$DEBUG_LOG"' EXIT
+  
+  echo "Processing hook at $(date)" >> "$DEBUG_LOG"
+  echo "Current directory: $(pwd)" >> "$DEBUG_LOG"
+  
+  # Perform operation with secure temp file
+  echo "Hook completed" >> "$DEBUG_LOG"
+  
+  # File is automatically cleaned up by trap
+---
+
+This hook demonstrates secure temporary file handling using mktemp with proper cleanup.

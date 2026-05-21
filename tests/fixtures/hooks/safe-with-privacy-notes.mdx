@@ -1,0 +1,31 @@
+---
+title: Safe Hook - With Privacy Notes
+slug: safe-with-privacy-notes
+category: hooks
+description: Hook with local data access and proper privacy notes disclosure
+cardDescription: Demonstrates proper privacy notes disclosure
+trigger: SessionStart
+scriptLanguage: bash
+privacyNotes:
+  - "Reads local workspace path and project name for session tracking"
+  - "Collects file count statistics from current directory"
+  - "Does not send any data to external services or third parties"
+  - "All collected data remains local to the user's machine"
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook accesses local workspace data with privacy disclosure
+  
+  # Read workspace metadata (with privacy notes disclosure)
+  WORKSPACE_PATH=$(pwd)
+  PROJECT_NAME=$(basename "$WORKSPACE_PATH")
+  
+  # Collect file statistics (with privacy notes disclosure)
+  FILE_COUNT=$(find . -type f 2>/dev/null | wc -l)
+  
+  # Store locally only (no external transmission)
+  echo "Session started: $PROJECT_NAME ($FILE_COUNT files)" >> ~/.claude/session.log
+  
+  echo "Session tracking initialized (local only)"
+---
+
+This hook demonstrates proper privacy notes disclosure for local data access.

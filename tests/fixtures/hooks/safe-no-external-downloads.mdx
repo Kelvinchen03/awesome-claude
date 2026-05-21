@@ -1,0 +1,26 @@
+---
+title: Safe Hook - No External Downloads
+slug: safe-no-external-downloads
+category: hooks
+description: Hook without external download references
+cardDescription: Demonstrates safe hook without downloads
+trigger: PostToolUse
+repoUrl: https://github.com/example/safe-hook
+scriptLanguage: bash
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook operates without downloading external archives
+  
+  # Check if required tools are available
+  if ! command -v git &> /dev/null; then
+    echo "Git is required but not installed"
+    exit 1
+  fi
+  
+  # Perform local operations only
+  git status --short
+  
+  echo "Hook completed successfully"
+---
+
+This hook demonstrates safe operation without external download/archive references.

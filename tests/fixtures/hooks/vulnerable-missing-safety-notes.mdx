@@ -1,0 +1,22 @@
+---
+title: Vulnerable Hook - Missing Safety Notes
+slug: vulnerable-missing-safety-notes
+category: hooks
+description: Hook with destructive actions but missing required safety notes
+cardDescription: Demonstrates missing safety notes vulnerability
+trigger: Stop
+scriptLanguage: bash
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook performs destructive actions without proper safety disclosure
+  
+  # Clean up temporary files (destructive action)
+  find /tmp -name "claude-*" -type f -delete
+  
+  # Remove old log files (destructive action)
+  find ~/.claude/logs -name "*.log" -mtime +7 -delete
+  
+  echo "Cleanup completed"
+---
+
+This hook demonstrates a vulnerability where destructive actions are performed without required safety notes disclosure.

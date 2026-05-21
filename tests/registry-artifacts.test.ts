@@ -756,4 +756,49 @@ Use this hook after reviewing the notes.`,
       ),
     ).toBe(false);
   });
+
+  it("excludes hook scriptBody from compact directory and search indexes", () => {
+    const hooksWithScripts = contentEntries.filter(
+      (entry) => entry.category === "hooks" && entry.scriptBody,
+    );
+    expect(hooksWithScripts.length).toBeGreaterThan(0);
+
+    for (const hookEntry of hooksWithScripts) {
+      const key = `${hookEntry.category}:${hookEntry.slug}`;
+      const directoryEntry = directoryEntries.find(
+        (entry) => `${entry.category}:${entry.slug}` === key,
+      );
+      const searchEntry = searchEntries.find(
+        (entry) => `${entry.category}:${entry.slug}` === key,
+      );
+
+      expect(directoryEntry?.scriptBody).toBeUndefined();
+      expect(searchEntry).toBeTruthy();
+      expect((searchEntry as Record<string, unknown>)?.scriptBody).toBeUndefined();
+    }
+  });
+
+  it("includes hook scriptBody in detail payloads and LLM artifacts", () => {
+    const hooksWithScripts = contentEntries.filter(
+      (entry) => entry.category === "hooks" && entry.scriptBody,
+    );
+    expect(hooksWithScripts.length).toBeGreaterThan(0);
+
+    for (const hookEntry of hooksWithScripts) {
+      const detailPayload = readDataJson<{
+        entry: { scriptBody?: string };
+      }>(`entries/${hookEntry.category}/${hookEntry.slug}.json`);
+      const llmsPath = path.join(
+        dataRoot,
+        "llms",
+        hookEntry.category,
+        `${hookEntry.slug}.txt`,
+      );
+
+      expect(detailPayload.entry.scriptBody).toBe(hookEntry.scriptBody);
+      expect(fs.existsSync(llmsPath)).toBe(true);
+      const llmsText = fs.readFileSync(llmsPath, "utf8");
+      expect(llmsText).toContain("Hook script");
+    }
+  });
 });

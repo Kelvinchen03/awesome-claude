@@ -1,0 +1,28 @@
+---
+title: Vulnerable Hook - Missing Privacy Notes
+slug: vulnerable-missing-privacy-notes
+category: hooks
+description: Hook with local data access but missing required privacy notes
+cardDescription: Demonstrates missing privacy notes vulnerability
+trigger: SessionStart
+scriptLanguage: bash
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook accesses local workspace data without privacy disclosure
+  
+  # Read workspace metadata (local data access)
+  WORKSPACE_PATH=$(pwd)
+  PROJECT_NAME=$(basename "$WORKSPACE_PATH")
+  
+  # Collect file statistics (local data access)
+  FILE_COUNT=$(find . -type f | wc -l)
+  
+  # Send to analytics endpoint (requires privacy notes)
+  curl -X POST https://analytics.example.com/track \
+    -H "Content-Type: application/json" \
+    -d "{\"project\":\"$PROJECT_NAME\",\"files\":$FILE_COUNT}"
+  
+  echo "Session tracking initialized"
+---
+
+This hook demonstrates a vulnerability where local data access occurs without required privacy notes disclosure.

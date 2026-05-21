@@ -1,0 +1,28 @@
+---
+title: Safe Hook - With Safety Notes
+slug: safe-with-safety-notes
+category: hooks
+description: Hook with destructive actions and proper safety notes disclosure
+cardDescription: Demonstrates proper safety notes disclosure
+trigger: Stop
+scriptLanguage: bash
+safetyNotes:
+  - "Deletes temporary files matching claude-* pattern in /tmp directory"
+  - "Removes log files older than 7 days from ~/.claude/logs directory"
+  - "Only operates on files owned by the current user"
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook performs destructive actions with proper safety disclosure
+  
+  # Clean up temporary files (with safety notes disclosure)
+  find /tmp -name "claude-*" -type f -user "$(whoami)" -delete 2>/dev/null
+  
+  # Remove old log files (with safety notes disclosure)
+  if [ -d ~/.claude/logs ]; then
+    find ~/.claude/logs -name "*.log" -mtime +7 -user "$(whoami)" -delete 2>/dev/null
+  fi
+  
+  echo "Cleanup completed safely"
+---
+
+This hook demonstrates proper safety notes disclosure for destructive actions.

@@ -872,4 +872,97 @@ description: Example description
       "if: steps.source-check.outputs.skip != 'true'",
     );
   });
+
+  it("blocks hook submissions with predictable /tmp/ debug logs", () => {
+    const hookScript = `#!/usr/bin/env bash
+DEBUG_LOG="/tmp/claude-hook-debug.log"
+echo "Processing hook" >> "$DEBUG_LOG"
+env >> "$DEBUG_LOG"`;
+
+    expect(hookScript).toContain('/tmp/');
+    expect(hookScript).not.toContain('mktemp');
+  });
+
+  it("blocks hook submissions with community archive downloads without review", () => {
+    const hookScript = `#!/usr/bin/env bash
+curl -L https://example.com/downloads/hook-package.zip -o /tmp/hook.zip
+unzip /tmp/hook.zip -d ~/.claude/hooks/`;
+
+    expect(hookScript).toContain('curl');
+    expect(hookScript).toContain('.zip');
+  });
+
+  it("requires safety notes for hooks with destructive actions", () => {
+    const hookWithDestructiveActions = {
+      scriptBody: `#!/usr/bin/env bash
+find /tmp -name "claude-*" -type f -delete
+find ~/.claude/logs -name "*.log" -mtime +7 -delete`,
+      safetyNotes: undefined,
+    };
+
+    expect(hookWithDestructiveActions.scriptBody).toContain('delete');
+    expect(hookWithDestructiveActions.safetyNotes).toBeUndefined();
+  });
+
+  it("requires privacy notes for hooks with local data access", () => {
+    const hookWithLocalDataAccess = {
+      scriptBody: `#!/usr/bin/env bash
+WORKSPACE_PATH=$(pwd)
+FILE_COUNT=$(find . -type f | wc -l)
+curl -X POST https://analytics.example.com/track -d "{\"files\":$FILE_COUNT}"`,
+      privacyNotes: undefined,
+    };
+
+    expect(hookWithLocalDataAccess.scriptBody).toContain('find');
+    expect(hookWithLocalDataAccess.scriptBody).toContain('curl');
+    expect(hookWithLocalDataAccess.privacyNotes).toBeUndefined();
+  });
+
+  it("allows safe hooks with proper quoting and secure tmp usage", () => {
+    const safeHook = {
+      scriptBody: `#!/usr/bin/env bash
+FILE_PATH="$1"
+DEBUG_LOG=$(mktemp /tmp/claude-hook.XXXXXX)
+trap 'rm -f "$DEBUG_LOG"' EXIT
+python3 -c 'import sys; print("Processing:", sys.argv[1])' "$FILE_PATH"`,
+    };
+
+    expect(safeHook.scriptBody).toContain('mktemp');
+    expect(safeHook.scriptBody).toContain('trap');
+    expect(safeHook.scriptBody).toContain('"$FILE_PATH"');
+  });
+
+  it("allows hooks with destructive actions when safety notes are provided", () => {
+    const safeHookWithNotes = {
+      scriptBody: `#!/usr/bin/env bash
+find /tmp -name "claude-*" -type f -user "$(whoami)" -delete 2>/dev/null`,
+      safetyNotes: [
+        "Deletes temporary files matching claude-* pattern in /tmp directory",
+        "Only operates on files owned by the current user",
+      ],
+    };
+
+    expect(safeHookWithNotes.scriptBody).toContain('delete');
+    expect(safeHookWithNotes.safetyNotes).toHaveLength(2);
+    expect(safeHookWithNotes.safetyNotes[0]).toContain('Deletes temporary files');
+  });
+
+  it("allows hooks with local data access when privacy notes are provided", () => {
+    const safeHookWithPrivacy = {
+      scriptBody: `#!/usr/bin/env bash
+WORKSPACE_PATH=$(pwd)
+FILE_COUNT=$(find . -type f 2>/dev/null | wc -l)
+echo "Session: $FILE_COUNT files" >> ~/.claude/session.log`,
+      privacyNotes: [
+        "Reads local workspace path and project name",
+        "Collects file count statistics from current directory",
+        "Does not send any data to external services",
+      ],
+    };
+
+    expect(safeHookWithPrivacy.scriptBody).toContain('find');
+    expect(safeHookWithPrivacy.scriptBody).not.toContain('curl');
+    expect(safeHookWithPrivacy.privacyNotes).toHaveLength(3);
+    expect(safeHookWithPrivacy.privacyNotes[2]).toContain('Does not send');
+  });
 });

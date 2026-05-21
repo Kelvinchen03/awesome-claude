@@ -1,0 +1,24 @@
+---
+title: Safe Hook - Proper Shell Quoting
+slug: safe-proper-quoting
+category: hooks
+description: Hook with proper shell quoting in embedded scripts
+cardDescription: Demonstrates safe quoting practices
+trigger: PostToolUse
+scriptLanguage: bash
+scriptBody: |
+  #!/usr/bin/env bash
+  # This hook demonstrates proper shell quoting practices
+  
+  # Properly quoted variable expansion
+  FILE_PATH="$1"
+  
+  # Safe python -c usage with proper quoting
+  python3 -c 'import sys; print("Processing:", sys.argv[1])' "$FILE_PATH"
+  
+  # Properly quoted command substitution
+  TIMESTAMP="$(date +%Y-%m-%d)"
+  echo "Processed at: $TIMESTAMP"
+---
+
+This hook demonstrates safe shell quoting practices in embedded scripts.
