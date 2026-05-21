@@ -120,6 +120,14 @@ function validToolArguments(name: string) {
     prepare_submission_draft: { fields: validMcpSubmissionFields },
     get_submission_examples: { category: "mcp" },
     review_submission_draft: { fields: validMcpSubmissionFields },
+    explain_entry_trust: { category: skill.category, slug: skill.slug },
+    compare_entry_trust: {
+      entries: [
+        { category: skill.category, slug: skill.slug },
+        { category: otherSkill.category, slug: otherSkill.slug },
+      ],
+    },
+    get_submission_guidance: { category: "mcp" },
   };
   if (!(name in argsByTool)) {
     throw new Error(`Missing protocol test arguments for ${name}.`);
@@ -326,7 +334,7 @@ describe("HeyClaude read-only MCP helpers", () => {
         /create_issue|create_pull_request|publish_content|write_file|delete/i,
       );
       expect(tool.description).toMatch(
-        /read-only|fetch|search|list|validate|build|guidance|review/i,
+        /read-only|fetch|search|list|validate|build|guidance|review|explain|compare|get/i,
       );
       expect(tool.annotations).toMatchObject({
         readOnlyHint: true,

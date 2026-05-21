@@ -247,6 +247,37 @@ export const ReviewSubmissionDraftInputSchema = z
   })
   .strict();
 
+export const ExplainEntryTrustInputSchema = z
+  .object({
+    category: pathPart,
+    slug: pathPart,
+    includeMissingMetadata: z.boolean().optional(),
+  })
+  .strict();
+
+export const CompareEntryTrustInputSchema = z
+  .object({
+    entries: z
+      .array(
+        z
+          .object({
+            category: pathPart,
+            slug: pathPart,
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(5),
+  })
+  .strict();
+
+export const GetSubmissionGuidanceInputSchema = z
+  .object({
+    category: submissionCategory.optional(),
+    fields: SubmissionFieldsSchema.optional(),
+  })
+  .strict();
+
 export const TOOL_INPUT_SCHEMAS = {
   search_registry: SearchRegistryInputSchema,
   server_info: ServerInfoInputSchema,
@@ -270,6 +301,9 @@ export const TOOL_INPUT_SCHEMAS = {
   prepare_submission_draft: PrepareSubmissionDraftInputSchema,
   get_submission_examples: GetSubmissionExamplesInputSchema,
   review_submission_draft: ReviewSubmissionDraftInputSchema,
+  explain_entry_trust: ExplainEntryTrustInputSchema,
+  compare_entry_trust: CompareEntryTrustInputSchema,
+  get_submission_guidance: GetSubmissionGuidanceInputSchema,
 };
 
 function stripUnsupportedJsonSchemaFields(value) {
