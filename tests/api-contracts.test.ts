@@ -30,6 +30,7 @@ const apiRoutes = [
   "/api/newsletter/webhook",
   "/api/og",
   "/api/submissions",
+  "/api/submissions/preflight",
   "/api/download",
   "/api/jobs",
   "/api/listing-leads",
@@ -122,6 +123,9 @@ describe("OpenAPI route coverage", () => {
     expect(parsedSchema.paths["/api/registry/search"]?.get?.parameters).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "platform", in: "query" }),
+        expect.objectContaining({ name: "hasSafetyNotes", in: "query" }),
+        expect.objectContaining({ name: "downloadTrust", in: "query" }),
+        expect.objectContaining({ name: "claimStatus", in: "query" }),
       ]),
     );
     expect(
@@ -136,6 +140,37 @@ describe("OpenAPI route coverage", () => {
     expect(
       parsedSchema.paths["/atom.xml"]?.get?.responses?.["200"]?.content,
     ).toHaveProperty("application/atom+xml");
+  });
+
+  it("documents facet counts on the registry search response", () => {
+    const searchResponse =
+      parsedSchema.paths["/api/registry/search"]?.get?.responses?.["200"];
+    const jsonContent = (
+      searchResponse?.content as Record<string, { schema?: unknown }> | undefined
+    )?.["application/json"];
+    const responseSchema = jsonContent?.schema as
+      | {
+          properties?: {
+            facets?: {
+              type?: string;
+              properties?: Record<string, unknown>;
+            };
+          };
+        }
+      | undefined;
+
+    expect(responseSchema?.properties?.facets?.type).toBe("object");
+    expect(Object.keys(responseSchema?.properties?.facets?.properties ?? {})).toEqual(
+      expect.arrayContaining([
+        "categories",
+        "platforms",
+        "hasSafetyNotes",
+        "hasPrivacyNotes",
+        "downloadTrust",
+        "claimStatus",
+        "sourceStatus",
+      ]),
+    );
   });
 
   it("documents error envelopes, cacheable feeds, and registry trust signals", () => {

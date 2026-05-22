@@ -106,145 +106,107 @@ jobs:
             --risk-json .github/tmp/submission-risk.json \
             --output .github/tmp/auto-import-precheck.json
 
-      - name: Auto-label submission issue
-        if: ${{ always() && steps.auto_import_precheck.outputs.eligible != 'true' }}
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
-        with:
-          script: |
-            const fs = require("node:fs");
-            const reportPath = ".github/tmp/submission-validation.json";
-            if (!fs.existsSync(reportPath)) return;
-            const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-
-            const { data: issue } = await github.rest.issues.get({
-              ...context.repo,
-              issue_number: context.issue.number
-            });
-            const managedValidationLabels = new Set([
-              "needs-author-input",
-              "source-needs-verification",
-              "stale-submission",
-              "auto-import-eligible"
-            ]);
-            const currentLabels = (issue.labels || [])
-              .map((label) => typeof label === "string" ? label : label.name)
-              .filter(Boolean);
-            const labels = new Set(
-              currentLabels.filter((label) => !managedValidationLabels.has(label))
-            );
-            for (const label of report.recommendedLabels || []) {
-              if (label) labels.add(label);
-            }
-            const nextLabels = [...labels].filter(Boolean);
-            try {
-              await github.rest.issues.setLabels({
-                ...context.repo,
-                issue_number: context.issue.number,
-                labels: nextLabels
-              });
-            } catch (error) {
-              core.warning(`Could not apply submission labels: ${error.message}`);
-            }
-
-      - name: HeyClaude Submission Bot mark auto-import eligible
-        if: ${{ always() && steps.auto_import_precheck.outputs.eligible == 'true' }}
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
-        with:
-          script: |
-            const label = "auto-import-eligible";
-            const managedValidationLabels = new Set([
-              "needs-author-input",
-              "source-needs-verification",
-              "stale-submission",
-              "auto-import-eligible"
-            ]);
-            try {
-              await github.rest.issues.updateLabel({
-                ...context.repo,
-                name: label,
-                color: "0e8a16",
-                description:
-                  "Submission passed deterministic gates and awaits maintainer-approved import PR"
-              });
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              await github.rest.issues.createLabel({
-                ...context.repo,
-                name: label,
-                color: "0e8a16",
-                description:
-                  "Submission passed deterministic gates and awaits maintainer-approved import PR"
-              });
-            }
-            const { data: issue } = await github.rest.issues.get({
-              ...context.repo,
-              issue_number: context.issue.number
-            });
-            const currentLabels = (issue.labels || [])
-              .map((currentLabel) =>
-                typeof currentLabel === "string" ? currentLabel : currentLabel.name
-              )
-              .filter(Boolean);
-            const nextLabels = new Set(
-              currentLabels.filter(
-                (currentLabel) => !managedValidationLabels.has(currentLabel)
-              )
-            );
-            nextLabels.add(label);
-            await github.rest.issues.setLabels({
-              ...context.repo,
-              issue_number: context.issue.number,
-              labels: [...nextLabels].filter(Boolean)
-            });
-
-      - name: Auto-label submission risk
+      - name: HeyClaude Submission Bot sync labels
         if: always()
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
+        env:
+          AUTO_IMPORT_ELIGIBLE: ${{ steps.auto_import_precheck.outputs.eligible }}
         with:
           script: |
             const fs = require("node:fs");
-            const reportPath = ".github/tmp/submission-risk.json";
-            if (!fs.existsSync(reportPath)) return;
-            const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-            const definitions = report.labelDefinitions || {};
-            for (const [name, definition] of Object.entries(definitions)) {
+            const validationPath = ".github/tmp/submission-validation.json";
+            const riskPath = ".github/tmp/submission-risk.json";
+            if (!fs.existsSync(validationPath)) return;
+            const validationReport = JSON.parse(fs.readFileSync(validationPath, "utf8"));
+            const riskReport = fs.existsSync(riskPath)
+              ? JSON.parse(fs.readFileSync(riskPath, "utf8"))
+              : {};
+            const autoImportEligible = process.env.AUTO_IMPORT_ELIGIBLE === "true";
+
+            const { data: issue } = await github.rest.issues.get({
+              ...context.repo,
+              issue_number: context.issue.number
+            });
+            const managedValidationLabels = new Set([
+              "needs-author-input",
+              "source-needs-verification",
+              "stale-submission",
+              "auto-import-eligible"
+            ]);
+            const riskLabelDefinitions = riskReport.labelDefinitions || {};
+            const riskLabels = new Set(Object.keys(riskLabelDefinitions));
+
+            async function ensureLabel(name, color, description) {
               try {
-                await github.rest.issues.updateLabel({
+                const { data: existing } = await github.rest.issues.getLabel({
                   ...context.repo,
-                  name,
-                  color: definition.color,
-                  description: definition.description
+                  name
                 });
+                if (
+                  existing.color !== color ||
+                  (existing.description || "") !== description
+                ) {
+                  await github.rest.issues.updateLabel({
+                    ...context.repo,
+                    name,
+                    color,
+                    description
+                  });
+                }
               } catch (error) {
                 if (error.status !== 404) throw error;
                 await github.rest.issues.createLabel({
                   ...context.repo,
                   name,
-                  color: definition.color,
-                  description: definition.description
+                  color,
+                  description
                 });
               }
             }
 
-            const { data: issue } = await github.rest.issues.get({
-              ...context.repo,
-              issue_number: context.issue.number
-            });
-            const riskLabels = new Set(Object.keys(definitions));
+            for (const [name, definition] of Object.entries(riskLabelDefinitions)) {
+              await ensureLabel(name, definition.color, definition.description);
+            }
+
+            if (autoImportEligible) {
+              await ensureLabel(
+                "auto-import-eligible",
+                "0e8a16",
+                "Submission passed deterministic gates and awaits maintainer-approved import PR"
+              );
+            }
+
             const currentLabels = (issue.labels || [])
               .map((label) => typeof label === "string" ? label : label.name)
               .filter(Boolean);
             const labels = new Set(
-              currentLabels.filter((label) => !riskLabels.has(label))
+              currentLabels.filter(
+                (label) =>
+                  !managedValidationLabels.has(label) && !riskLabels.has(label)
+              )
             );
-            for (const label of report.recommendedLabels || []) {
+            const validationLabels = autoImportEligible
+              ? ["auto-import-eligible"]
+              : validationReport.recommendedLabels || [];
+            for (const label of validationLabels) {
               if (label) labels.add(label);
             }
-            await github.rest.issues.setLabels({
-              ...context.repo,
-              issue_number: context.issue.number,
-              labels: [...labels].filter(Boolean)
-            });
+            for (const label of riskReport.recommendedLabels || []) {
+              if (label) labels.add(label);
+            }
+            const nextLabels = [...labels].filter(Boolean).sort();
+            const currentSortedLabels = [...new Set(currentLabels)].sort();
+            if (JSON.stringify(currentSortedLabels) !== JSON.stringify(nextLabels)) {
+              try {
+                await github.rest.issues.setLabels({
+                  ...context.repo,
+                  issue_number: context.issue.number,
+                  labels: nextLabels
+                });
+              } catch (error) {
+                core.warning(`Could not apply submission labels: ${error.message}`);
+              }
+            }
 
       - name: Preview import output
         if: always()
@@ -277,41 +239,62 @@ jobs:
           fs.writeFileSync(".github/tmp/submission-import-preview.md", result.stdout, "utf8");
           NODE
 
-      - name: Post validation report comment
+      - name: Post HeyClaude submission check comment
         if: always()
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
         with:
           script: |
             const fs = require("node:fs");
-            const reportPath = ".github/tmp/submission-validation.json";
-            if (!fs.existsSync(reportPath)) return;
+            const validationPath = ".github/tmp/submission-validation.json";
+            if (!fs.existsSync(validationPath)) return;
 
-            const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+            const report = JSON.parse(fs.readFileSync(validationPath, "utf8"));
+            const riskJsonPath = ".github/tmp/submission-risk.json";
+            const riskReport = fs.existsSync(riskJsonPath)
+              ? JSON.parse(fs.readFileSync(riskJsonPath, "utf8"))
+              : {};
 
-            const marker = "<!-- submission-validation-report -->";
+            const marker = "<!-- heyclaude-submission-check -->";
+            const escapeMarkdownOrMention = (value) =>
+              String(value ?? "")
+                .replace(/\r/g, "")
+                .replace(/\n/g, " ")
+                .slice(0, 4000)
+                .replace(/\\/g, "\\\\")
+                .replace(/`/g, "\\`")
+                .replace(/([*_{}\[\]()#+\-.!|>])/g, "\\$1")
+                .replace(/</g, "&lt;")
+                .replace(/@/g, "&#64;");
+            const escapeCodeBlock = (value) =>
+              String(value ?? "")
+                .replace(/\r/g, "")
+                .replace(/```/g, "` ` `")
+                .replace(/@/g, "&#64;");
             const heading = report.skipped
-              ? "## Submission validation: needs more detail"
+              ? "## HeyClaude submission check: needs more detail"
               : report.ok
-                ? "## Submission validation: passed"
-                : "## Submission validation: failed";
+                ? "## HeyClaude submission check: passed"
+                : "## HeyClaude submission check: failed";
 
             const lines = [
               marker,
               heading,
               "",
-              `- Category: \`${report.category || "unknown"}\``,
+              `- Category: ${escapeMarkdownOrMention(report.category || "unknown")}`,
               report.errors?.length ? `- Errors: ${report.errors.length}` : "- Errors: 0",
-              report.warnings?.length ? `- Warnings: ${report.warnings.length}` : "- Warnings: 0"
+              report.warnings?.length ? `- Warnings: ${report.warnings.length}` : "- Warnings: 0",
+              `- Risk tier: ${escapeMarkdownOrMention(riskReport.riskTier || "unknown")}`,
+              `- Policy decision: ${escapeMarkdownOrMention(riskReport.policyDecision || "maintainer_review")}`
             ];
 
             if (report.errors?.length) {
               lines.push("", "### Errors");
-              for (const error of report.errors) lines.push(`- ${error}`);
+              for (const error of report.errors) lines.push(`- ${escapeMarkdownOrMention(error)}`);
             }
 
             if (report.warnings?.length) {
               lines.push("", "### Warnings");
-              for (const warning of report.warnings) lines.push(`- ${warning}`);
+              for (const warning of report.warnings) lines.push(`- ${escapeMarkdownOrMention(warning)}`);
             }
 
             if (report.skipped) {
@@ -329,14 +312,46 @@ jobs:
               const [firstLine, ...rest] = preview.split("\n");
               const importPath = firstLine?.replace(/^Would write\s+/, "").trim();
               if (importPath) {
-                lines.push("", "### Import preview", `- Output path: \`${importPath}\``);
+                lines.push("", "### Import preview", `- Output path: ${escapeMarkdownOrMention(importPath)}`);
               } else {
                 lines.push("", "### Import preview");
               }
               const mdxPreview = rest.join("\n").trim();
               if (mdxPreview) {
-                const capped = mdxPreview.split("\n").slice(0, 120).join("\n");
+                const capped = escapeCodeBlock(mdxPreview.split("\n").slice(0, 120).join("\n"));
                 lines.push("", "<details><summary>Dry-run MDX preview</summary>", "", "```mdx", capped, "```", "</details>");
+              }
+            }
+
+            if (riskReport.reviewFlags?.length) {
+              lines.push("", "### Security/safety signals");
+              for (const flag of riskReport.reviewFlags) {
+                lines.push(
+                  `- ${escapeMarkdownOrMention(flag.severity || "info")} ${escapeMarkdownOrMention(flag.summary || flag.id)} (${escapeMarkdownOrMention(flag.id)})`
+                );
+              }
+            }
+
+            if (riskReport.classificationWarnings?.length) {
+              lines.push("", "### Policy warnings");
+              for (const warning of riskReport.classificationWarnings) {
+                lines.push(
+                  `- ${escapeMarkdownOrMention(warning.summary || warning.id)} (${escapeMarkdownOrMention(warning.id)})`
+                );
+              }
+            }
+
+            if (riskReport.requestChangesReasons?.length) {
+              lines.push("", "### Blockers");
+              for (const reason of riskReport.requestChangesReasons) {
+                lines.push(`- ${escapeMarkdownOrMention(reason)}`);
+              }
+            }
+
+            if (riskReport.humanReviewNotes?.length) {
+              lines.push("", "### Maintainer notes");
+              for (const note of riskReport.humanReviewNotes) {
+                lines.push(`- ${escapeMarkdownOrMention(note)}`);
               }
             }
 
@@ -351,15 +366,27 @@ jobs:
               per_page: 100
             });
 
-            const existing = comments.find((comment) => comment.body?.includes(marker));
+            const isWorkflowBotComment = (comment) =>
+              comment.user?.type === "Bot" &&
+              comment.user?.login === "github-actions[bot]" &&
+              typeof comment.body === "string";
+            const existing = comments.find(
+              (comment) => isWorkflowBotComment(comment) && comment.body.includes(marker)
+            );
+            const oldMarkers = [
+              "<!-- submission-validation-report -->",
+              "<!-- submission-risk-report -->"
+            ];
 
             if (existing) {
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: existing.id,
-                body
-              });
+              if (existing.body !== body) {
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existing.id,
+                  body
+                });
+              }
             } else {
               await github.rest.issues.createComment({
                 owner,
@@ -369,39 +396,18 @@ jobs:
               });
             }
 
-      - name: Post risk report comment
-        if: always()
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
-        with:
-          script: |
-            const fs = require("node:fs");
-            const reportPath = ".github/tmp/submission-risk.md";
-            if (!fs.existsSync(reportPath)) return;
-            const body = fs.readFileSync(reportPath, "utf8");
-            const marker = "<!-- submission-risk-report -->";
-            const { owner, repo } = context.repo;
-            const issue_number = context.issue.number;
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number,
-              per_page: 100
-            });
-            const existing = comments.find((comment) => comment.body?.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: existing.id,
-                body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number,
-                body
-              });
+            for (const comment of comments) {
+              if (
+                isWorkflowBotComment(comment) &&
+                comment.id !== existing?.id &&
+                oldMarkers.some((oldMarker) => comment.body.includes(oldMarker))
+              ) {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: comment.id
+                });
+              }
             }
 
       - name: Fail when submission risk is critical

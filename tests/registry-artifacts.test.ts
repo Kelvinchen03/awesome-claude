@@ -1,4 +1,6 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -82,6 +84,10 @@ describe("registry artifacts", () => {
       brandedCount: number;
       sourceAvailableCount: number;
       checksumPresentCount: number;
+      claimedOrReviewedPercent: number;
+      safetyNotesCount: number;
+      privacyNotesCount: number;
+      firstPartyPackageCount: number;
       recommendedFixCount: number;
       entriesNeedingAttention: number;
     };
@@ -163,6 +169,7 @@ describe("registry artifacts", () => {
       brandName: "Asana",
       brandDomain: "asana.com",
       brandAssetSource: "brandfetch",
+      downloadUrl: expect.any(String),
     });
     expect(raycastEntry).toMatchObject({
       brandName: "Asana",
@@ -177,6 +184,7 @@ describe("registry artifacts", () => {
       brandAssetSource: "brandfetch",
     });
     expect(raycastDetail).toHaveProperty("author");
+    expect(String(raycastDetail.detailMarkdown)).toContain("## Trust");
     expect(llmsText).toContain("- Brand: Asana");
     expect(llmsText).toContain("- Brand domain: asana.com");
 
@@ -208,6 +216,9 @@ describe("registry artifacts", () => {
     expect(rebuilt.summary).toEqual(trustReportPayload.summary);
     expect(trustReportPayload.summary.sourceAvailableCount).toBeGreaterThan(0);
     expect(trustReportPayload.summary.checksumPresentCount).toBeGreaterThan(0);
+    expect(trustReportPayload.summary).toHaveProperty("safetyNotesCount");
+    expect(trustReportPayload.summary).toHaveProperty("privacyNotesCount");
+    expect(trustReportPayload.summary).toHaveProperty("firstPartyPackageCount");
     expect(trustReportPayload.summary.recommendedFixCount).toBe(
       trustReportPayload.entries.reduce(
         (sum, entry) => sum + entry.recommendations.length,
@@ -450,8 +461,10 @@ Use this hook after reviewing the notes.`,
     const [searchEntry] = buildSearchEntries([entry]);
     expect(searchEntry.safetyNotes).toEqual(entry.safetyNotes);
     expect(searchEntry.privacyNotes).toEqual(entry.privacyNotes);
+    expect(searchEntry.downloadUrl).toBe("");
     expect(buildRaycastDetailMarkdown(entry)).toContain("## Safety notes");
     expect(buildRaycastDetailMarkdown(entry)).toContain("## Privacy notes");
+    expect(buildRaycastDetailMarkdown(entry)).toContain("## Trust");
     expect(renderEntryLlms(entry)).toContain("## Safety Notes");
     expect(renderEntryLlms(entry)).toContain("## Privacy Notes");
   });
@@ -609,6 +622,77 @@ Use this hook after reviewing the notes.`,
     expect(
       searchEntries.some((entry) => entry.platforms?.includes("Gemini")),
     ).toBe(true);
+  });
+
+  it("keeps Retro Daily startup debug logs in the user's private metrics directory", () => {
+    const detailPayload = readDataJson<{
+      entry: {
+        scriptBody: string;
+      };
+    }>("entries/hooks/retro-daily.json");
+    const scriptBody = detailPayload.entry.scriptBody;
+
+    expect(scriptBody).not.toContain("/tmp/claude-startup.log");
+    expect(scriptBody).toContain(
+      'DEBUG_LOG_DIR="${RETRO_DAILY_HOME:-$HOME/.claude/metrics}"',
+    );
+    expect(scriptBody).toContain('DEBUG_LOG="$DEBUG_LOG_DIR/startup.log"');
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "retro-daily-hook-"));
+    try {
+      const homeDir = path.join(tmpDir, "home");
+      const metricsDir = path.join(homeDir, ".claude", "metrics");
+      fs.mkdirSync(metricsDir, { recursive: true });
+
+      const scriptPath = path.join(metricsDir, "startup.sh");
+      fs.writeFileSync(scriptPath, scriptBody, "utf8");
+      fs.chmodSync(scriptPath, 0o700);
+      fs.writeFileSync(
+        path.join(metricsDir, "_paths.sh"),
+        'RETRO_DAILY_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n',
+        "utf8",
+      );
+
+      for (const name of [
+        "daily-insights",
+        "scout",
+        "tag-sessions",
+        "scout-review",
+      ]) {
+        const helperPath = path.join(metricsDir, `${name}.sh`);
+        fs.writeFileSync(
+          helperPath,
+          `#!/bin/bash\necho "${name} private output"\n`,
+          "utf8",
+        );
+        fs.chmodSync(helperPath, 0o700);
+      }
+
+      execFileSync("bash", ["-n", scriptPath], { stdio: "pipe" });
+      const output = execFileSync("bash", [scriptPath], {
+        cwd: tmpDir,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          HOME: homeDir,
+          USER: "victim",
+          CLAUDE_CODE_SESSION: "session-abc",
+        },
+        stdio: "pipe",
+      });
+
+      expect(output).toContain("daily-insights private output");
+      const logPath = path.join(metricsDir, "startup.log");
+      const logMode = fs.statSync(logPath).mode & 0o777;
+      const dirMode = fs.statSync(metricsDir).mode & 0o777;
+      expect(logMode).toBe(0o600);
+      expect(dirMode).toBe(0o700);
+      expect(fs.readFileSync(logPath, "utf8")).toContain(
+        "CLAUDE_CODE_SESSION=session-abc",
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("writes per-entry detail, LLM, and Raycast payloads", () => {

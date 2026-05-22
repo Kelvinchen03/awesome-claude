@@ -18,6 +18,180 @@ import {
 import { repoRoot } from "./helpers/registry-fixtures";
 
 describe("submission automation workflows", () => {
+  function writeFile(filePath: string, content: string) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content, "utf8");
+  }
+
+  function git(cwd: string, args: string[]) {
+    return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  }
+
+  function runClassifierForChangedFiles(files: Record<string, string>) {
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "heyclaude-classifier-"),
+    );
+    git(tmpDir, ["init", "-b", "main"]);
+    git(tmpDir, ["config", "user.name", "HeyClaude Test"]);
+    git(tmpDir, ["config", "user.email", "test@example.com"]);
+    writeFile(path.join(tmpDir, "README.md"), "# Test\n");
+    git(tmpDir, ["add", "README.md"]);
+    git(tmpDir, ["commit", "-m", "test: initial content"]);
+    const baseSha = git(tmpDir, ["rev-parse", "HEAD"]);
+
+    for (const [filePath, content] of Object.entries(files)) {
+      writeFile(path.join(tmpDir, filePath), content);
+    }
+    git(tmpDir, ["add", "."]);
+    git(tmpDir, ["commit", "-m", "test: update content"]);
+
+    const outputPath = path.join(tmpDir, "github-output.txt");
+    execFileSync(
+      process.execPath,
+      [path.join(repoRoot, "scripts/ci/classify-pr-changes.mjs")],
+      {
+        cwd: tmpDir,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          BASE_SHA: baseSha,
+          FORCE_FULL_VALIDATION: "0",
+          GITHUB_EVENT_NAME: "pull_request",
+          GITHUB_OUTPUT: outputPath,
+        },
+      },
+    );
+
+    return Object.fromEntries(
+      fs
+        .readFileSync(outputPath, "utf8")
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => {
+          const separator = line.indexOf("=");
+          return [line.slice(0, separator), line.slice(separator + 1)];
+        }),
+    );
+  }
+
+  function runContentPolicyForChangedFiles(
+    files: Record<
+      string,
+      string | { content: string; status?: string; baseContent?: string }
+    >,
+    options: {
+      headRepo?: string;
+      baseRepo?: string;
+      prAuthor?: string;
+    } = {},
+  ) {
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "heyclaude-content-policy-"),
+    );
+    const changedFiles = [];
+
+    for (const [filePath, spec] of Object.entries(files)) {
+      const content = typeof spec === "string" ? spec : spec.content;
+      const status = typeof spec === "string" ? "modified" : spec.status;
+      const baseContent =
+        typeof spec === "string" ? undefined : spec.baseContent;
+      writeFile(path.join(tmpDir, filePath), content);
+      changedFiles.push({
+        filename: filePath,
+        status: status || "modified",
+        ...(baseContent === undefined ? {} : { baseContent }),
+      });
+    }
+
+    const filesPath = path.join(tmpDir, "changed-files.json");
+    const outputPath = path.join(tmpDir, "content-policy.json");
+    fs.writeFileSync(filesPath, JSON.stringify(changedFiles), "utf8");
+
+    try {
+      execFileSync(
+        process.execPath,
+        [
+          path.join(repoRoot, "scripts/ci/validate-content-policy.mjs"),
+          "--repo-root",
+          tmpDir,
+          "--files-json",
+          filesPath,
+          "--head-repo",
+          options.headRepo || "contributor/awesome-claude",
+          "--base-repo",
+          options.baseRepo || "JSONbored/awesome-claude",
+          "--pr-author",
+          options.prAuthor || "contributor",
+          "--output",
+          outputPath,
+        ],
+        { cwd: repoRoot, encoding: "utf8", stdio: "pipe" },
+      );
+      return {
+        ok: true,
+        report: JSON.parse(fs.readFileSync(outputPath, "utf8")),
+      };
+    } catch (error) {
+      const execError = error as { stdout?: unknown; stderr?: unknown };
+      return {
+        ok: false,
+        stdout: String(execError.stdout || ""),
+        stderr: String(execError.stderr || ""),
+        report: fs.existsSync(outputPath)
+          ? JSON.parse(fs.readFileSync(outputPath, "utf8"))
+          : null,
+      };
+    }
+  }
+
+  function contentFixture(frontmatter: string, body = "Useful content.") {
+    return `---\n${frontmatter.trim()}\n---\n\n${body}\n`;
+  }
+
+  it("keeps direct PR quality evidence requirements visible", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, ".github/pull_request_template.md"),
+      "utf8",
+    );
+
+    expect(source).toContain("## Quality Evidence");
+    expect(source).toContain("Desktop:");
+    expect(source).toContain("Mobile:");
+    expect(source).toContain("No visual impact");
+    expect(source).toContain("Important edge cases or invariants");
+    expect(source).toContain("Backward compatibility notes");
+    expect(source).toContain("Accessibility notes for UI changes");
+  });
+
+  it("keeps product feature issues scoped with screenshot expectations", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, ".github/ISSUE_TEMPLATE/product-feature.yml"),
+      "utf8",
+    );
+
+    expect(source).toContain("Product or feature improvement");
+    expect(source).toContain("id: quality_evidence");
+    expect(source).toContain("desktop and mobile screenshots");
+    expect(source).toContain("No visual impact");
+    expect(source).toContain("Generated artifacts stay out of scope");
+    expect(source).toContain("Closes #<issue>");
+  });
+
+  it("keeps the devcontainer minimal and manual-install oriented", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, ".devcontainer/devcontainer.json"),
+      "utf8",
+    );
+    const config = JSON.parse(source);
+
+    expect(config.image).toContain("javascript-node");
+    expect(config.image).toContain("24");
+    expect(config.postCreateCommand).toContain("corepack enable");
+    expect(config.postCreateCommand).toContain("pnpm@11.1.3");
+    expect(config.postCreateCommand).not.toContain("pnpm install");
+    expect(config.postCreateCommand).not.toContain("playwright install");
+  });
+
   it("keeps public issue validation read-only for imports", () => {
     const source = fs.readFileSync(
       path.join(repoRoot, ".github/workflows/submission-issue-validation.yml"),
@@ -38,7 +212,9 @@ describe("submission automation workflows", () => {
     expect(source).toContain("steps.auto_import_precheck.outputs.eligible");
     expect(source).toContain("managedValidationLabels");
     expect(source).toContain("issues.setLabels");
-    expect(source).toContain("Post risk report comment");
+    expect(source).toContain("Post HeyClaude submission check comment");
+    expect(source).toContain("<!-- heyclaude-submission-check -->");
+    expect(source).not.toContain("Post risk report comment");
     expect(source).toContain("Fail when submission risk is critical");
     expect(source).toContain("Summarize invalid submission issue");
     expect(source).toContain("--informational");
@@ -310,57 +486,73 @@ describe("submission automation workflows", () => {
     expect(outputLines).not.toContain("eligible=true");
   });
 
-  it("reviews direct content PRs without executing fork code", () => {
+  it("removes the noisy direct PR risk workflow", () => {
+    expect(
+      fs.existsSync(
+        path.join(repoRoot, ".github/workflows/submission-pr-risk.yml"),
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps advisory Superagent scanning read-only and secret-gated", () => {
     const source = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/submission-pr-risk.yml"),
+      path.join(repoRoot, ".github/workflows/superagent-security.yml"),
       "utf8",
     );
 
-    expect(source).toContain("pull_request_target:");
-    expect(source).toContain("Analyze PR content through GitHub API");
-    expect(source).not.toContain("actions/checkout");
-    expect(source).not.toContain("pnpm install");
-    expect(source).not.toContain("Setup Node.js");
-    expect(source).not.toContain("Setup pnpm");
-    expect(source).not.toContain(
-      "ref: ${{ github.event.pull_request.base.sha }}",
-    );
-    expect(source).toContain("github.rest.repos.getContent");
-    expect(source).toContain("pr.head.sha");
-    expect(source).toContain("read as data only");
-    expect(source).toContain("never checks out PR code");
-    expect(source).toContain("### Contributor");
-    expect(source).toContain("### Contribution");
-    expect(source).toContain("contributorAnalysis");
-    expect(source).toContain("contributionAnalysis");
-    expect(source).toContain("contributorAnalysisTarget");
-    expect(source).toContain('contributorSource !== "submission_issue_author"');
-    expect(source).toContain("analysisTarget.fallback");
-    expect(source).toContain("analysis.accountAgeDays < 30");
-    expect(source).not.toContain("} else if (ageDays < 30)");
-    expect(source).not.toContain(
-      "report.effectiveContributor || pullRequestActor || pr.user",
-    );
-    expect(source).toContain("github.rest.repos.get");
-    expect(source).toContain("sourceType");
-    expect(source).toContain("automation_import");
-    expect(source).toContain("submissionIssueContributors");
-    expect(source).toContain("Submission provenance validation found blockers");
+    expect(source).toContain("pull_request:");
+    expect(source).toContain("workflow_dispatch:");
+    expect(source).not.toContain("pull_request_target");
+    expect(source).toContain("contents: read");
+    expect(source).toContain("superagent-repo-scan:");
+    expect(source).toContain("name: superagent-repo-scan");
+    expect(source).toContain("SUPERAGENT_API_KEY");
+    expect(source).toContain("DAYTONA_API_KEY");
+    expect(source).toContain("Checkout trusted scanner tools");
     expect(source).toContain(
-      "Submission security/safety review found critical blockers",
+      "ref: ${{ github.event.pull_request.base.sha || github.sha }}",
     );
-    expect(source).toContain("REQUEST_CHANGES");
-    expect(source).toContain("ARCHIVE_PACKAGE_EXTENSIONS");
-    expect(source).toContain("HEYCLAUDE_HOSTNAME");
-    expect(source).toContain("const downloadHost = hostname(downloadUrl)");
-    expect(source).toContain("const isHeyClaudeDownloadRequest");
-    expect(source).toContain("community_archive_download");
-    expect(source).toContain("community_local_download_request");
-    expect(source).toContain("isArchivePackageUrl(downloadUrl)");
-    expect(source).toContain("missing_safety_notes");
-    expect(source).toContain("missing_privacy_notes");
-    expect(source).toContain("review.body?.includes(REVIEW_MARKER)");
-    expect(source).not.toContain("git checkout");
+    expect(source).toContain("path: scanner-tools");
+    expect(source).toContain("pnpm install --frozen-lockfile --ignore-scripts");
+    expect(source).toContain("working-directory: scanner-tools");
+    expect(source).toContain("pnpm exec superagent scan");
+    expect(source).toContain('--repo "$SCAN_REPO"');
+    expect(source).toContain('--branch "$SCAN_BRANCH"');
+    expect(source).toContain(
+      "Fork pull requests rely on the installed Marketplace app checks.",
+    );
+  });
+
+  it("keeps Pipelock advisory and pinned", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/pipelock-security.yml"),
+      "utf8",
+    );
+
+    expect(source).toContain("pull_request:");
+    expect(source).toContain("workflow_dispatch:");
+    expect(source).not.toContain("pull_request_target");
+    expect(source).toContain("contents: read");
+    expect(source).toContain(
+      "luckyPipewrench/pipelock@dcd25d8ea407f087fa9f2d4a0f8bddea5c997f07",
+    );
+    expect(source).toContain('fail-on-findings: "false"');
+    expect(source).toContain("continue-on-error: true");
+  });
+
+  it("limits Socket app reports to dependency files", () => {
+    const source = fs.readFileSync(path.join(repoRoot, "socket.yml"), "utf8");
+
+    expect(source).toContain("version: 2");
+    expect(source).toContain("triggerPaths:");
+    expect(source).toContain("package.json");
+    expect(source).toContain("pnpm-lock.yaml");
+    expect(source).toContain("apps/web/package.json");
+    expect(source).toContain("packages/mcp/package.json");
+    expect(source).toContain("packages/registry/package.json");
+    expect(source).toContain("integrations/raycast/package.json");
+    expect(source).toContain("githubApp:");
+    expect(source).toContain("enabled: true");
   });
 
   it("opens import PRs only after accepted/import-approved labels", () => {
@@ -421,6 +613,15 @@ describe("submission automation workflows", () => {
       "utf8",
     );
 
+    expect(source).toContain("classify-pr:");
+    expect(source).toContain("required-pr-gate:");
+    expect(source).toContain("validate-content-${{ matrix.category }}");
+    expect(source).toContain(
+      "fromJson(needs.classify-pr.outputs.content_categories_json)",
+    );
+    expect(source).toContain("Summarize required PR validation");
+    expect(source).toContain('trunk check --ci --upstream "$BASE_SHA"');
+    expect(source).toContain("trunk check --ci --all");
     expect(source).toContain("validate-pr-preview:");
     expect(source).toContain("github.event_name == 'pull_request'");
     expect(source).toContain("Deploy same-repo PR preview to dev Worker");
@@ -431,26 +632,285 @@ describe("submission automation workflows", () => {
     expect(source).toContain("pnpm resend:sync-templates -- --dry-run");
   });
 
-  it("keeps contributor generated artifact edits out of direct content PRs", () => {
+  it("feeds deterministic content policy into required PR validation", () => {
     const source = fs.readFileSync(
       path.join(repoRoot, ".github/workflows/content-validation.yml"),
       "utf8",
     );
 
-    expect(source).toContain("Reject external generated artifact changes");
-    expect(source).toContain("Generated artifacts and package artifacts");
-    expect(source).toContain("package artifacts are maintainer-owned");
+    expect(source).toContain("validate-content-policy:");
+    expect(source).toContain("Validate direct content policy");
+    expect(source).toContain("scripts/ci/validate-content-policy.mjs");
+    expect(source).toContain("needs.classify-pr.outputs.content == 'true'");
+    expect(source).toContain("needs.classify-pr.outputs.registry == 'true'");
+    expect(source).toContain("needs.classify-pr.outputs.packages == 'true'");
+    expect(source).toContain("validate-content-policy");
+    expect(source).toContain("trusted_policy");
+    expect(source).toContain("trusted_policy_dir");
+    expect(source).toContain("runtime_lock_path");
+    expect(source).toContain(
+      "scripts/ci/content-policy-runtime/package-lock.json",
+    );
+    expect(source).toContain("npm ci --ignore-scripts");
+    expect(source).toContain("--ignore-scripts");
+    expect(source).toContain("--no-audit --no-fund");
+    expect(source).toContain("persist-credentials: false");
+    expect(source).not.toContain('ln -s "$GITHUB_WORKSPACE/node_modules"');
     expect(source).toContain(
       "HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}",
     );
-    expect(source).toContain('[ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]');
-    expect(source).toContain("exit 0");
-    expect(source).toContain("apps/web/public/downloads");
-    expect(source).toContain("content/skills/.+\\.zip$");
-    expect(source).toContain("content/mcp/.+\\.mcpb$");
-    expect(source).toContain("Regenerate README for pull request validation");
-    expect(source).toContain("pnpm generate:readme");
+    expect(source).toContain("Build registry artifacts");
+    expect(source).toContain("pnpm --filter web run prebuild");
     expect(source).toContain("pnpm validate:readme");
+    expect(source).toContain(
+      "git diff --exit-code apps/web/public/data apps/web/src/generated README.md",
+    );
+  });
+
+  it("routes hook-only content PRs to hook validation only", () => {
+    const lanes = runClassifierForChangedFiles({
+      "content/hooks/retro-daily.mdx": contentFixture(`
+title: Retro Daily
+slug: retro-daily
+category: hooks
+description: Daily Claude Code retro dashboard hook.
+`),
+    });
+
+    expect(lanes.content).toBe("true");
+    expect(lanes.content_categories_json).toBe('["hooks"]');
+    expect(lanes.registry).toBe("false");
+    expect(lanes.web).toBe("false");
+    expect(lanes.mcp).toBe("false");
+    expect(lanes.raycast).toBe("false");
+    expect(lanes.packages).toBe("false");
+  });
+
+  it("blocks external generated artifact edits through content policy", () => {
+    const result = runContentPolicyForChangedFiles({
+      "README.md": "# Changed by contributor\n",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report?.failures.join("\n")).toContain(
+      "Direct contributor PRs should not edit README.md",
+    );
+  });
+
+  it("blocks new direct content PR entries without submitter provenance", () => {
+    const result = runContentPolicyForChangedFiles({
+      "content/mcp/no-provenance.mdx": {
+        status: "added",
+        content: contentFixture(
+          `
+title: No Provenance MCP
+slug: no-provenance
+category: mcp
+description: Example MCP server without submitter provenance.
+installCommand: "npx -y no-provenance"
+usageSnippet: "claude mcp add no-provenance -- npx -y no-provenance"
+`,
+          "Source-backed MCP server content.",
+        ),
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report?.provenanceFindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "missing_direct_pr_submitter_content/mcp/no-provenance.mdx",
+        }),
+      ]),
+    );
+  });
+
+  it("allows external metadata updates to existing content without submitter provenance", () => {
+    const baseContent = contentFixture(
+      `
+title: Existing Hook
+slug: existing-hook
+category: hooks
+description: Existing SessionStart hook entry.
+`,
+      "This SessionStart hook reads local workspace logs and summarizes user activity.",
+    );
+    const result = runContentPolicyForChangedFiles({
+      "content/hooks/existing-hook.mdx": {
+        status: "modified",
+        baseContent,
+        content: contentFixture(
+          `
+title: Existing Hook
+slug: existing-hook
+category: hooks
+description: Existing SessionStart hook entry.
+safetyNotes:
+  - Runs as a Claude Code SessionStart hook and can execute local shell scripts.
+privacyNotes:
+  - Reads local Claude Code activity and workspace-derived logs for summaries.
+`,
+          "This SessionStart hook reads local workspace logs and summarizes user activity.",
+        ),
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.report?.provenanceFindings).toEqual([]);
+  });
+
+  it("blocks external metadata updates that change existing submitter provenance", () => {
+    const baseContent = contentFixture(
+      `
+title: Existing MCP
+slug: existing-mcp
+category: mcp
+description: Existing MCP server entry.
+submittedBy: original-submitter
+submittedByUrl: https://github.com/original-submitter
+installCommand: "npx -y existing-mcp"
+usageSnippet: "claude mcp add existing-mcp -- npx -y existing-mcp"
+`,
+      "Source-backed MCP server content.",
+    );
+    const result = runContentPolicyForChangedFiles({
+      "content/mcp/existing-mcp.mdx": {
+        status: "modified",
+        baseContent,
+        content: contentFixture(
+          `
+title: Existing MCP
+slug: existing-mcp
+category: mcp
+description: Existing MCP server entry.
+submittedBy: someone-else
+submittedByUrl: https://github.com/someone-else
+installCommand: "npx -y existing-mcp"
+usageSnippet: "claude mcp add existing-mcp -- npx -y existing-mcp"
+`,
+          "Source-backed MCP server content.",
+        ),
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report?.provenanceFindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "direct_pr_existing_provenance_change_content/mcp/existing-mcp.mdx",
+        }),
+      ]),
+    );
+  });
+
+  it("blocks external metadata updates that add provenance to existing content", () => {
+    const baseContent = contentFixture(
+      `
+title: Existing MCP
+slug: existing-mcp
+category: mcp
+description: Existing MCP server entry.
+installCommand: "npx -y existing-mcp"
+usageSnippet: "claude mcp add existing-mcp -- npx -y existing-mcp"
+`,
+      "Source-backed MCP server content.",
+    );
+    const result = runContentPolicyForChangedFiles({
+      "content/mcp/existing-mcp.mdx": {
+        status: "modified",
+        baseContent,
+        content: contentFixture(
+          `
+title: Existing MCP
+slug: existing-mcp
+category: mcp
+description: Existing MCP server entry.
+submittedBy: contributor
+submittedByUrl: https://github.com/contributor
+installCommand: "npx -y existing-mcp"
+usageSnippet: "claude mcp add existing-mcp -- npx -y existing-mcp"
+`,
+          "Source-backed MCP server content.",
+        ),
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report?.provenanceFindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "direct_pr_existing_provenance_change_content/mcp/existing-mcp.mdx",
+        }),
+      ]),
+    );
+  });
+
+  it("blocks community local download requests through content policy", () => {
+    const result = runContentPolicyForChangedFiles({
+      "content/skills/example-skill.mdx": contentFixture(
+        `
+title: Example Skill
+slug: example-skill
+category: skills
+description: Example source-backed skill.
+submittedBy: contributor
+submittedByUrl: https://github.com/contributor
+downloadUrl: /downloads/example-skill.zip
+`,
+        "Use this skill after reviewing the source.",
+      ),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report?.failures.join("\n")).toContain(
+      "Community PRs cannot request HeyClaude-hosted /downloads package URLs.",
+    );
+  });
+
+  it("blocks external packageVerified true through content policy", () => {
+    const result = runContentPolicyForChangedFiles({
+      "content/skills/example-skill.mdx": contentFixture(
+        `
+title: Example Skill
+slug: example-skill
+category: skills
+description: Example source-backed skill.
+submittedBy: contributor
+submittedByUrl: https://github.com/contributor
+packageVerified: true
+`,
+        "Use this skill after reviewing the source.",
+      ),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report?.failures.join("\n")).toContain(
+      "External contributor PRs cannot mark packages as packageVerified: true.",
+    );
+  });
+
+  it("blocks sensitive content without safety or privacy notes", () => {
+    const result = runContentPolicyForChangedFiles({
+      "content/hooks/session-start-retro.mdx": contentFixture(
+        `
+title: Session Start Retro
+slug: session-start-retro
+category: hooks
+description: SessionStart hook for reviewing local Claude Code activity.
+submittedBy: contributor
+submittedByUrl: https://github.com/contributor
+`,
+        "This SessionStart background hook reads local workspace logs and summarizes user activity.",
+      ),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report?.failures.join("\n")).toContain(
+      "needs safetyNotes disclosure",
+    );
+    expect(result.report?.failures.join("\n")).toContain(
+      "needs privacyNotes disclosure",
+    );
   });
 
   it("uses generated README refresh body metadata instead of a static PR body", () => {
@@ -622,7 +1082,7 @@ description: Example description
     );
 
     expect(source).toContain(
-      "| Issue | Status | Security | Policy | Source | Contributor | Age | Category | Slug | Action | Notes |",
+      "| Issue | Group | Status | Security | Policy | Source | Contributor | Age | Category | Slug | Action | Notes |",
     );
     expect(source).toContain("entry.riskSummary");
     expect(source).toContain("entry.riskFlags");
@@ -776,14 +1236,61 @@ description: Example description
     );
   });
 
-  it("keeps required validation checks wired for README and changelog PRs", () => {
+  it("keeps required validation classification wired for README and changelog PRs", () => {
     const source = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/content-validation.yml"),
+      path.join(repoRoot, "scripts/ci/classify-pr-changes.mjs"),
       "utf8",
     );
 
-    expect(source).toContain('- "README.md"');
-    expect(source).toContain('- "CHANGELOG.md"');
+    expect(source).toContain('"README.md"');
+    expect(source).toContain("/^.*\\.md$/");
+    expect(source).toContain("CONTENT_CATEGORIES");
+    expect(source).toContain("content_categories_json");
+  });
+
+  it("routes hook-only content PRs to hook content validation", () => {
+    const outputs = runClassifierForChangedFiles({
+      "content/hooks/retro-daily.mdx": "---\ntitle: Retro Daily\n---\n",
+    });
+
+    expect(outputs.content).toBe("true");
+    expect(outputs.content_hooks).toBe("true");
+    expect(outputs.content_mcp).toBe("false");
+    expect(outputs.content_categories_json).toBe('["hooks"]');
+    expect(outputs.web).toBe("false");
+    expect(outputs.mcp).toBe("false");
+    expect(outputs.raycast).toBe("false");
+    expect(outputs.packages).toBe("false");
+    expect(outputs.registry).toBe("false");
+    expect(outputs.ci).toBe("false");
+  });
+
+  it("routes multi-category content PRs to only touched category validators", () => {
+    const outputs = runClassifierForChangedFiles({
+      "content/hooks/retro-daily.mdx": "---\ntitle: Retro Daily\n---\n",
+      "content/mcp/example-server.mdx": "---\ntitle: Example Server\n---\n",
+    });
+
+    expect(outputs.content_categories_json).toBe('["hooks","mcp"]');
+    expect(outputs.content_hooks).toBe("true");
+    expect(outputs.content_mcp).toBe("true");
+    expect(outputs.content_skills).toBe("false");
+    expect(outputs.web).toBe("false");
+    expect(outputs.raycast).toBe("false");
+    expect(outputs.packages).toBe("false");
+    expect(outputs.registry).toBe("false");
+  });
+
+  it("routes generated registry artifacts to artifact validation", () => {
+    const outputs = runClassifierForChangedFiles({
+      "apps/web/public/data/raycast/entries.json": "[]\n",
+    });
+
+    expect(outputs.content).toBe("false");
+    expect(outputs.registry).toBe("true");
+    expect(outputs.web).toBe("true");
+    expect(outputs.raycast).toBe("true");
+    expect(outputs.packages).toBe("false");
   });
 
   it("does not document GitHub PATs in MCP process arguments", () => {
