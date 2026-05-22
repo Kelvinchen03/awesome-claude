@@ -120,7 +120,6 @@ function validToolArguments(name: string) {
     prepare_submission_draft: { fields: validMcpSubmissionFields },
     get_submission_examples: { category: "mcp" },
     review_submission_draft: { fields: validMcpSubmissionFields },
-    explain_entry_trust: { category: skill.category, slug: skill.slug },
     compare_entry_trust: {
       entries: [
         { category: skill.category, slug: skill.slug },
@@ -1215,6 +1214,55 @@ describe("HeyClaude read-only MCP helpers", () => {
     expect(feeds.platforms.map((item: any) => item.feedSlug)).toEqual(
       expect.arrayContaining(["claude", "cursor"]),
     );
+  });
+
+  it("compares entry trust indicators side-by-side without absolute rankings", async () => {
+    const result = await callRegistryTool(
+      "compare_entry_trust",
+      {
+        entries: [
+          { category: skill.category, slug: skill.slug },
+          { category: otherSkill.category, slug: otherSkill.slug },
+        ],
+      },
+      { dataDir },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      count: 2,
+      comparisonNotes: expect.arrayContaining([
+        expect.stringContaining("side-by-side"),
+      ]),
+    });
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries[0]).toMatchObject({
+      key: `${skill.category}:${skill.slug}`,
+      category: skill.category,
+      slug: skill.slug,
+      trustIndicators: expect.any(Object),
+      sourceContext: expect.any(Object),
+    });
+  });
+
+  it("returns category-specific submission guidance with field validation", async () => {
+    const result = await callRegistryTool(
+      "get_submission_guidance",
+      { category: "mcp" },
+      { dataDir },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      category: "mcp",
+      allCategories: expect.any(Array),
+      guidanceByCategory: expect.any(Object),
+      submissionSteps: expect.any(Array),
+      examplesHint: expect.stringContaining("get_submission_examples"),
+    });
+    expect(result.guidanceByCategory.mcp).toMatchObject({
+      label: expect.any(String),
+      contentRequired: expect.any(Array),
+      submissionRequired: expect.any(Array),
+    });
   });
 
   it("handles malformed or missing requests without exposing mutations", async () => {

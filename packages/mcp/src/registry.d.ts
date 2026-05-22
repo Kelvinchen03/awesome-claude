@@ -150,11 +150,6 @@ export function reviewSubmissionDraft(
   options?: RegistryArtifactLoaders,
 ): Promise<RegistryToolResult>;
 
-export function explainEntryTrust(
-  args?: Record<string, unknown>,
-  options?: RegistryArtifactLoaders,
-): Promise<RegistryToolResult>;
-
 export function compareEntryTrust(
   args?: Record<string, unknown>,
   options?: RegistryArtifactLoaders,
@@ -195,7 +190,6 @@ export {
   PrepareSubmissionDraftInputSchema,
   GetSubmissionExamplesInputSchema,
   ReviewSubmissionDraftInputSchema,
-  ExplainEntryTrustInputSchema,
   CompareEntryTrustInputSchema,
   GetSubmissionGuidanceInputSchema,
   TOOL_INPUT_SCHEMAS,

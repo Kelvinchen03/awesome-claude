@@ -81,7 +81,6 @@ export const READ_ONLY_TOOL_NAMES = [
   "prepare_submission_draft",
   "get_submission_examples",
   "review_submission_draft",
-  "explain_entry_trust",
   "compare_entry_trust",
   "get_submission_guidance",
 ];
@@ -225,12 +224,6 @@ export const TOOL_DEFINITIONS = [
     description:
       "Review a HeyClaude submission draft locally for schema errors, duplicate risk, and maintainer checklist items without writing to GitHub.",
     inputSchema: jsonSchemaForTool("review_submission_draft"),
-  },
-  {
-    name: "explain_entry_trust",
-    description:
-      "Explain trust and safety context for a HeyClaude registry entry without making installation recommendations. Provides conservative analysis of available metadata, trust indicators, source context, and explicitly identifies missing information.",
-    inputSchema: jsonSchemaForTool("explain_entry_trust"),
   },
   {
     name: "compare_entry_trust",
@@ -1465,90 +1458,6 @@ export async function reviewSubmissionDraft(args = {}, options = {}) {
   return reviewSubmissionDraftFromSpec(spec, args, unwrapEntries(searchIndex));
 }
 
-export async function explainEntryTrust(args = {}, options = {}) {
-  const category = normalizeText(args.category);
-  const slug = normalizeText(args.slug);
-  const includeMissingMetadata = args.includeMissingMetadata !== false;
-
-  if (!category || !slug) {
-    return invalid("category and slug are required.");
-  }
-
-  const entry = await readEntry(category, slug, options);
-  if (!entry) {
-    return notFound(`No HeyClaude entry found for ${category}/${slug}.`);
-  }
-
-  const source = sourceSummary(entry);
-  const safetyNotes = notes(entry.safetyNotes);
-  const privacyNotes = notes(entry.privacyNotes);
-
-  const trustIndicators = {
-    hasOfficialSource: Boolean(entry.repoUrl || entry.githubUrl),
-    hasDocumentation: Boolean(entry.documentationUrl),
-    hasDownloadUrl: Boolean(entry.downloadUrl),
-    hasGithubStats: typeof entry.githubStars === "number",
-    hasRepoUpdateTimestamp: Boolean(entry.repoUpdatedAt),
-    hasVerificationStatus: Boolean(entry.verificationStatus),
-    hasMaintainerSignature: Boolean(entry.downloadTrust),
-    hasInstallCommand: Boolean(entry.installCommand),
-    hasConfigSnippet: Boolean(entry.configSnippet),
-    hasSafetyNotes: safetyNotes.length > 0,
-    hasPrivacyNotes: privacyNotes.length > 0,
-  };
-
-  const sourceContext = {
-    repoUrl: source.repoUrl,
-    documentationUrl: source.documentationUrl,
-    downloadUrl: source.downloadUrl,
-    sourceHosts: source.sourceHosts,
-    githubStars: source.githubStars,
-    githubForks: source.githubForks,
-    repoUpdatedAt: source.repoUpdatedAt,
-    downloadTrust: source.downloadTrust,
-  };
-
-  const missingMetadata = includeMissingMetadata
-    ? {
-        noOfficialSource: !trustIndicators.hasOfficialSource,
-        noDocumentation: !trustIndicators.hasDocumentation,
-        noGithubStats: !trustIndicators.hasGithubStats,
-        noRepoUpdateTimestamp: !trustIndicators.hasRepoUpdateTimestamp,
-        noVerificationStatus: !trustIndicators.hasVerificationStatus,
-        noMaintainerSignature: !trustIndicators.hasMaintainerSignature,
-        noSafetyNotes: !trustIndicators.hasSafetyNotes,
-        noPrivacyNotes: !trustIndicators.hasPrivacyNotes,
-      }
-    : null;
-
-  const conservativeGuidance = [
-    "This analysis describes available metadata only.",
-    "Absence of indicators does not imply malicious intent.",
-    "Review source code and documentation before installation.",
-    "Trust signals like GitHub stars indicate popularity, not security.",
-    "Maintainer signatures or download trust metadata, when present, indicate package integrity checks.",
-    "Safety and privacy notes are maintainer-provided context, not security guarantees.",
-  ];
-
-  return {
-    ok: true,
-    key: `${entry.category}:${entry.slug}`,
-    category: entry.category,
-    slug: entry.slug,
-    title: entry.title,
-    canonicalUrl: `${SITE_URL}/${entry.category}/${entry.slug}`,
-    trustIndicators,
-    sourceContext,
-    safetyNotes,
-    privacyNotes,
-    missingMetadata,
-    conservativeGuidance,
-    verificationStatus: entry.verificationStatus || null,
-    verifiedAt: entry.verifiedAt || null,
-    dateAdded: entry.dateAdded || null,
-  };
-}
-
 export async function compareEntryTrust(args = {}, options = {}) {
   const entries = [];
   for (const target of args.entries || []) {
@@ -1770,9 +1679,6 @@ export async function callRegistryTool(name, args = {}, options = {}) {
       break;
     case "review_submission_draft":
       result = await reviewSubmissionDraft(parsedArgs, options);
-      break;
-    case "explain_entry_trust":
-      result = await explainEntryTrust(parsedArgs, options);
       break;
     case "compare_entry_trust":
       result = await compareEntryTrust(parsedArgs, options);

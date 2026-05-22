@@ -23,7 +23,6 @@ export const CategorySubmissionGuidanceInputSchema: z.ZodType;
 export const PrepareSubmissionDraftInputSchema: z.ZodType;
 export const GetSubmissionExamplesInputSchema: z.ZodType;
 export const ReviewSubmissionDraftInputSchema: z.ZodType;
-export const ExplainEntryTrustInputSchema: z.ZodType;
 export const CompareEntryTrustInputSchema: z.ZodType;
 export const GetSubmissionGuidanceInputSchema: z.ZodType;
 export const TOOL_INPUT_SCHEMAS: Record<string, z.ZodType>;
