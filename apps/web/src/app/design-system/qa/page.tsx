@@ -4,7 +4,8 @@ import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Screenshot QA Process",
-  description: "Guidelines for running visual regression and screenshot comparison tests across HeyClaude.",
+  description:
+    "Guidelines for running visual regression and screenshot comparison tests across HeyClaude.",
   path: "/design-system/qa",
   robots: { index: false, follow: false },
 });
@@ -34,7 +35,9 @@ function H3({ children }: { children: React.ReactNode }) {
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-base leading-8 text-muted-foreground">{children}</p>;
+  return (
+    <p className="text-base leading-8 text-muted-foreground">{children}</p>
+  );
 }
 
 function Ul({ children }: { children: React.ReactNode }) {
@@ -73,7 +76,9 @@ export default function ScreenshotQaPage() {
 
       <section className="space-y-4">
         <H2>Target Views</H2>
-        <P>Each release must pass screenshot comparison on the following routes:</P>
+        <P>
+          Each release must pass screenshot comparison on the following routes:
+        </P>
         <Ul>
           <Li>
             <strong className="text-foreground">Home</strong> —{" "}
@@ -82,27 +87,37 @@ export default function ScreenshotQaPage() {
           </Li>
           <Li>
             <strong className="text-foreground">Browse</strong> —{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">/browse</code>{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+              /browse
+            </code>{" "}
             Directory listing, search bar, filters, and cards.
           </Li>
           <Li>
             <strong className="text-foreground">Detail</strong> —{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">/:category/:slug</code>{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+              /:category/:slug
+            </code>{" "}
             Entry detail page with markdown prose, related cards, and vote rail.
           </Li>
           <Li>
             <strong className="text-foreground">Submit</strong> —{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">/submit</code>{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+              /submit
+            </code>{" "}
             Submission form, preview card, and readiness check.
           </Li>
           <Li>
             <strong className="text-foreground">Quality</strong> —{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">/quality</code>{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+              /quality
+            </code>{" "}
             Quality signals, provenance, and SEO checklist.
           </Li>
           <Li>
             <strong className="text-foreground">Submissions</strong> —{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">/submissions</code>{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+              /submissions
+            </code>{" "}
             Submission queue and editorial status.
           </Li>
         </Ul>
@@ -175,16 +190,21 @@ test("browse page matches visual reference", async ({ page }) => {
         <H2>Thresholds &amp; Tolerance</H2>
         <Ul>
           <Li>
-            Default pixel diff ratio: <code className="rounded bg-muted px-1.5 py-0.5 text-sm">0.2</code>
+            Default pixel diff ratio:{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">0.2</code>
           </Li>
           <Li>
             Animations are disabled during capture via{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">caret-color: transparent</code>{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+              caret-color: transparent
+            </code>{" "}
             and reduced-motion emulation.
           </Li>
           <Li>
-            Dynamic content (e.g., live GitHub stars) is stubbed or hidden
-            with <code className="rounded bg-muted px-1.5 py-0.5 text-sm">data-testid="screenshot-stable"</code>{" "}
+            Dynamic content (e.g., live GitHub stars) is stubbed or hidden with{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+              data-testid="screenshot-stable"
+            </code>{" "}
             wrappers where possible.
           </Li>
         </Ul>
@@ -194,8 +214,10 @@ test("browse page matches visual reference", async ({ page }) => {
         <H2>Baseline Storage</H2>
         <P>
           Baseline screenshots are committed to the repository under{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">tests/__screenshots__/</code>.
-          Each platform and viewport gets its own subdirectory so CI can run
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            tests/__screenshots__/
+          </code>
+          . Each platform and viewport gets its own subdirectory so CI can run
           Linux baselines while local development uses macOS or Windows
           equivalents.
         </P>

@@ -1,7 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Search, ChevronRight, Type, Palette, Layers, Box, Badge, AlertTriangle, Lock, CheckSquare2, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  Search,
+  ChevronRight,
+  Type,
+  Palette,
+  Layers,
+  Box,
+  Badge,
+  AlertTriangle,
+  Lock,
+  CheckSquare2,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +55,9 @@ function ColorSwatch({
       <div className="h-20 w-full" style={{ background: value }} />
       <div className="space-y-1 p-3">
         <p className="text-xs font-semibold text-foreground">{label}</p>
-        <p className="text-[10px] font-mono text-muted-foreground">{variable}</p>
+        <p className="text-[10px] font-mono text-muted-foreground">
+          {variable}
+        </p>
       </div>
     </div>
   );
@@ -133,44 +148,122 @@ export function DesignSystemReferenceClient() {
                   Design System Reference
                 </h1>
                 <p className="text-lg text-muted-foreground">
-                  Comprehensive visual reference for design tokens, UI primitives, and component states.
+                  Comprehensive visual reference for design tokens, UI
+                  primitives, and component states.
                 </p>
               </div>
 
-              <CollapsibleSection id="colors" title="Colors" icon={Palette} defaultOpen>
+              <CollapsibleSection
+                id="colors"
+                title="Colors"
+                icon={Palette}
+                defaultOpen
+              >
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <ColorSwatch label="Background" variable="--background" value="var(--background)" />
-                  <ColorSwatch label="Foreground" variable="--foreground" value="var(--foreground)" />
-                  <ColorSwatch label="Primary" variable="--primary" value="var(--primary)" />
-                  <ColorSwatch label="Primary Foreground" variable="--primary-foreground" value="var(--primary-foreground)" />
-                  <ColorSwatch label="Secondary" variable="--secondary" value="var(--secondary)" />
-                  <ColorSwatch label="Secondary Foreground" variable="--secondary-foreground" value="var(--secondary-foreground)" />
-                  <ColorSwatch label="Muted" variable="--muted" value="var(--muted)" />
-                  <ColorSwatch label="Muted Foreground" variable="--muted-foreground" value="var(--muted-foreground)" />
-                  <ColorSwatch label="Accent" variable="--accent" value="var(--accent)" />
-                  <ColorSwatch label="Accent Foreground" variable="--accent-foreground" value="var(--accent-foreground)" />
-                  <ColorSwatch label="Destructive" variable="--destructive" value="var(--destructive)" />
-                  <ColorSwatch label="Border" variable="--border" value="var(--border)" />
-                  <ColorSwatch label="Card" variable="--card" value="var(--card)" />
-                  <ColorSwatch label="Card Foreground" variable="--card-foreground" value="var(--card-foreground)" />
-                  <ColorSwatch label="Input" variable="--input" value="var(--input)" />
-                  <ColorSwatch label="Ring" variable="--ring" value="var(--ring)" />
+                  <ColorSwatch
+                    label="Background"
+                    variable="--background"
+                    value="var(--background)"
+                  />
+                  <ColorSwatch
+                    label="Foreground"
+                    variable="--foreground"
+                    value="var(--foreground)"
+                  />
+                  <ColorSwatch
+                    label="Primary"
+                    variable="--primary"
+                    value="var(--primary)"
+                  />
+                  <ColorSwatch
+                    label="Primary Foreground"
+                    variable="--primary-foreground"
+                    value="var(--primary-foreground)"
+                  />
+                  <ColorSwatch
+                    label="Secondary"
+                    variable="--secondary"
+                    value="var(--secondary)"
+                  />
+                  <ColorSwatch
+                    label="Secondary Foreground"
+                    variable="--secondary-foreground"
+                    value="var(--secondary-foreground)"
+                  />
+                  <ColorSwatch
+                    label="Muted"
+                    variable="--muted"
+                    value="var(--muted)"
+                  />
+                  <ColorSwatch
+                    label="Muted Foreground"
+                    variable="--muted-foreground"
+                    value="var(--muted-foreground)"
+                  />
+                  <ColorSwatch
+                    label="Accent"
+                    variable="--accent"
+                    value="var(--accent)"
+                  />
+                  <ColorSwatch
+                    label="Accent Foreground"
+                    variable="--accent-foreground"
+                    value="var(--accent-foreground)"
+                  />
+                  <ColorSwatch
+                    label="Destructive"
+                    variable="--destructive"
+                    value="var(--destructive)"
+                  />
+                  <ColorSwatch
+                    label="Border"
+                    variable="--border"
+                    value="var(--border)"
+                  />
+                  <ColorSwatch
+                    label="Card"
+                    variable="--card"
+                    value="var(--card)"
+                  />
+                  <ColorSwatch
+                    label="Card Foreground"
+                    variable="--card-foreground"
+                    value="var(--card-foreground)"
+                  />
+                  <ColorSwatch
+                    label="Input"
+                    variable="--input"
+                    value="var(--input)"
+                  />
+                  <ColorSwatch
+                    label="Ring"
+                    variable="--ring"
+                    value="var(--ring)"
+                  />
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection id="typography" title="Typography" icon={Type}>
+              <CollapsibleSection
+                id="typography"
+                title="Typography"
+                icon={Type}
+              >
                 <div className="space-y-6">
                   <div className="space-y-4">
                     <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                       .display-title
                     </p>
-                    <p className="display-title text-foreground">Display Title</p>
+                    <p className="display-title text-foreground">
+                      Display Title
+                    </p>
                   </div>
                   <div className="space-y-4">
                     <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                       .section-title
                     </p>
-                    <p className="section-title text-foreground">Section Title</p>
+                    <p className="section-title text-foreground">
+                      Section Title
+                    </p>
                   </div>
                   <div className="space-y-4">
                     <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -182,44 +275,90 @@ export function DesignSystemReferenceClient() {
                   </div>
                   <div className="space-y-2">
                     <p className="text-base leading-8 text-foreground">
-                      Base body text — Plus Jakarta Sans, 16px, 1.75 line-height.
+                      Base body text — Plus Jakarta Sans, 16px, 1.75
+                      line-height.
                     </p>
                     <p className="text-sm leading-7 text-muted-foreground">
-                      Secondary body text — smaller, muted color for descriptions.
+                      Secondary body text — smaller, muted color for
+                      descriptions.
                     </p>
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                       Eyebrow / Label text
                     </p>
                   </div>
                   <div className="space-y-2 text-sm">
-                    <p className="font-sans text-foreground">Sans-serif — var(--font-sans)</p>
-                    <p className="font-mono text-foreground">Mono — var(--font-mono)</p>
-                    <p className="font-serif text-foreground">Serif — var(--font-serif)</p>
+                    <p className="font-sans text-foreground">
+                      Sans-serif — var(--font-sans)
+                    </p>
+                    <p className="font-mono text-foreground">
+                      Mono — var(--font-mono)
+                    </p>
+                    <p className="font-serif text-foreground">
+                      Serif — var(--font-serif)
+                    </p>
                   </div>
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection id="spacing" title="Spacing & Radii" icon={Layers}>
+              <CollapsibleSection
+                id="spacing"
+                title="Spacing & Radii"
+                icon={Layers}
+              >
                 <div className="space-y-6">
                   <div className="surface-panel p-4">
                     <p className="text-sm text-foreground">
-                      .container-shell — max 1240px, centered with 1rem side gutters
+                      .container-shell — max 1240px, centered with 1rem side
+                      gutters
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-4">
                     {[
-                      { label: "sm", className: "rounded-sm", size: "h-12 w-12" },
-                      { label: "md", className: "rounded-md", size: "h-12 w-12" },
-                      { label: "lg", className: "rounded-lg", size: "h-12 w-12" },
-                      { label: "xl", className: "rounded-xl", size: "h-12 w-12" },
-                      { label: "2xl", className: "rounded-2xl", size: "h-12 w-12" },
-                      { label: "3xl", className: "rounded-3xl", size: "h-12 w-12" },
+                      {
+                        label: "sm",
+                        className: "rounded-sm",
+                        size: "h-12 w-12",
+                      },
+                      {
+                        label: "md",
+                        className: "rounded-md",
+                        size: "h-12 w-12",
+                      },
+                      {
+                        label: "lg",
+                        className: "rounded-lg",
+                        size: "h-12 w-12",
+                      },
+                      {
+                        label: "xl",
+                        className: "rounded-xl",
+                        size: "h-12 w-12",
+                      },
+                      {
+                        label: "2xl",
+                        className: "rounded-2xl",
+                        size: "h-12 w-12",
+                      },
+                      {
+                        label: "3xl",
+                        className: "rounded-3xl",
+                        size: "h-12 w-12",
+                      },
                     ].map((r) => (
-                      <div key={r.label} className="flex flex-col items-center gap-2">
+                      <div
+                        key={r.label}
+                        className="flex flex-col items-center gap-2"
+                      >
                         <div
-                          className={cn("border border-border bg-primary/20", r.className, r.size)}
+                          className={cn(
+                            "border border-border bg-primary/20",
+                            r.className,
+                            r.size,
+                          )}
                         />
-                        <span className="text-[10px] text-muted-foreground">{r.label}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {r.label}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -228,16 +367,28 @@ export function DesignSystemReferenceClient() {
 
               <CollapsibleSection id="shadows" title="Shadows" icon={Box}>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {["shadow-2xs", "shadow-xs", "shadow-sm", "shadow", "shadow-md", "shadow-lg", "shadow-xl", "shadow-2xl"].map(
-                    (shadow) => (
-                      <div
-                        key={shadow}
-                        className={cn("h-20 rounded-xl border border-border bg-card flex items-center justify-center", shadow)}
-                      >
-                        <span className="text-xs text-muted-foreground">{shadow}</span>
-                      </div>
-                    ),
-                  )}
+                  {[
+                    "shadow-2xs",
+                    "shadow-xs",
+                    "shadow-sm",
+                    "shadow",
+                    "shadow-md",
+                    "shadow-lg",
+                    "shadow-xl",
+                    "shadow-2xl",
+                  ].map((shadow) => (
+                    <div
+                      key={shadow}
+                      className={cn(
+                        "h-20 rounded-xl border border-border bg-card flex items-center justify-center",
+                        shadow,
+                      )}
+                    >
+                      <span className="text-xs text-muted-foreground">
+                        {shadow}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </CollapsibleSection>
 
@@ -307,36 +458,55 @@ export function DesignSystemReferenceClient() {
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection id="cards" title="Cards & Panels" icon={Layers}>
+              <CollapsibleSection
+                id="cards"
+                title="Cards & Panels"
+                icon={Layers}
+              >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="surface-panel p-4">
-                    <p className="text-sm font-medium text-foreground">.surface-panel</p>
+                    <p className="text-sm font-medium text-foreground">
+                      .surface-panel
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      rounded-2xl border border-border/80 bg-card/80 shadow-sm backdrop-blur
+                      rounded-2xl border border-border/80 bg-card/80 shadow-sm
+                      backdrop-blur
                     </p>
                   </div>
                   <div className="section-card p-4">
-                    <p className="text-sm font-medium text-foreground">.section-card</p>
+                    <p className="text-sm font-medium text-foreground">
+                      .section-card
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      rounded-3xl border border-border/80 bg-card/90 shadow-sm backdrop-blur
+                      rounded-3xl border border-border/80 bg-card/90 shadow-sm
+                      backdrop-blur
                     </p>
                   </div>
                   <div className="directory-card p-4">
-                    <p className="text-sm font-medium text-foreground">.directory-card</p>
+                    <p className="text-sm font-medium text-foreground">
+                      .directory-card
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       rounded-2xl border border-border bg-card shadow-sm
                     </p>
                   </div>
                   <div className="directory-stack-card p-4">
-                    <p className="text-sm font-medium text-foreground">.directory-stack-card</p>
+                    <p className="text-sm font-medium text-foreground">
+                      .directory-stack-card
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      flex gap-4 rounded-[1.35rem] border border-border/80 bg-card/96
+                      flex gap-4 rounded-[1.35rem] border border-border/80
+                      bg-card/96
                     </p>
                   </div>
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection id="badges" title="Badges & Tags" icon={Badge}>
+              <CollapsibleSection
+                id="badges"
+                title="Badges & Tags"
+                icon={Badge}
+              >
                 <div className="flex flex-wrap gap-3">
                   <span className="eyebrow">Eyebrow</span>
                   <span className="directory-tag">Directory tag</span>
@@ -348,7 +518,11 @@ export function DesignSystemReferenceClient() {
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection id="notices" title="Notice Cards" icon={AlertTriangle}>
+              <CollapsibleSection
+                id="notices"
+                title="Notice Cards"
+                icon={AlertTriangle}
+              >
                 <div className="space-y-4">
                   <div className="entry-notice-card entry-notice-card-safety">
                     <div className="flex items-start gap-3">
@@ -356,8 +530,12 @@ export function DesignSystemReferenceClient() {
                         <AlertTriangle className="size-4" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">Safety notice</p>
-                        <p className="text-xs text-muted-foreground">.entry-notice-card-safety</p>
+                        <p className="text-sm font-medium text-foreground">
+                          Safety notice
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          .entry-notice-card-safety
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -367,8 +545,12 @@ export function DesignSystemReferenceClient() {
                         <Lock className="size-4" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">Privacy notice</p>
-                        <p className="text-xs text-muted-foreground">.entry-notice-card-privacy</p>
+                        <p className="text-sm font-medium text-foreground">
+                          Privacy notice
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          .entry-notice-card-privacy
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -411,25 +593,35 @@ export function DesignSystemReferenceClient() {
                 </div>
               </CollapsibleSection>
 
-              <CollapsibleSection id="components" title="Components" icon={CheckSquare2}>
+              <CollapsibleSection
+                id="components"
+                title="Components"
+                icon={CheckSquare2}
+              >
                 <div className="space-y-6">
                   <div className="space-y-3 max-w-xl">
                     <div className="checklist-item">
                       <div className="checklist-item-box" />
-                      <span className="text-sm text-foreground">Unchecked checklist item</span>
+                      <span className="text-sm text-foreground">
+                        Unchecked checklist item
+                      </span>
                     </div>
                     <div className="checklist-item checklist-item-complete">
                       <div className="checklist-item-box checklist-item-box-complete">
                         <CheckSquare2 className="size-3" />
                       </div>
-                      <span className="text-sm text-foreground">Complete checklist item</span>
+                      <span className="text-sm text-foreground">
+                        Complete checklist item
+                      </span>
                     </div>
                   </div>
                   <div className="directory-vote-rail">
                     <div className="vote-button">
                       <ChevronUp className="size-4" />
                     </div>
-                    <span className="text-sm font-medium text-foreground">42</span>
+                    <span className="text-sm font-medium text-foreground">
+                      42
+                    </span>
                     <div className="vote-button">
                       <ChevronDown className="size-4" />
                     </div>

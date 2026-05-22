@@ -12,7 +12,8 @@ export default defineConfig({
       threshold: 0.2,
     },
   },
-  snapshotPathTemplate: "{testDir}/../__screenshots__/{testFileName}/{arg}-{projectName}{ext}",
+  snapshotPathTemplate:
+    "{testDir}/../__screenshots__/{testFileName}/{arg}-{projectName}{ext}",
   reporter: [
     ["list"],
     ["junit", { outputFile: "reports/junit/playwright.xml" }],
