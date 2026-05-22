@@ -7,13 +7,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: {
     timeout: 10_000,
-    toHaveScreenshot: {
-      maxDiffPixelRatio: 0.02,
-      threshold: 0.2,
-    },
   },
-  snapshotPathTemplate:
-    "{testDir}/../__screenshots__/{testFileName}/{arg}-{projectName}{ext}",
   reporter: [
     ["list"],
     ["junit", { outputFile: "reports/junit/playwright.xml" }],
@@ -33,20 +27,11 @@ export default defineConfig({
   projects: [
     {
       name: "desktop-chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        viewport: { width: 1920, height: 1080 },
-      },
+      use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "mobile-chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        viewport: { width: 375, height: 667 },
-        userAgent: devices["iPhone SE"].userAgent,
-        isMobile: true,
-        hasTouch: true,
-      },
+      use: { ...devices["Pixel 7"] },
     },
   ],
 });

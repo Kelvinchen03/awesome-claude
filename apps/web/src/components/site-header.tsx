@@ -80,20 +80,6 @@ export function SiteHeader() {
             className="hidden h-5 w-px bg-border/80 md:inline-block"
             aria-hidden
           />
-          <nav className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex">
-            <Link
-              href="/design-system/reference"
-              className="transition hover:text-foreground"
-            >
-              Design
-            </Link>
-            <Link
-              href="/design-system/qa"
-              className="transition hover:text-foreground"
-            >
-              QA
-            </Link>
-          </nav>
           <ThemeToggle />
           <Link
             href="/submit"
