@@ -237,6 +237,10 @@ export const registrySearchResponseSchema = z.object({
     })
     .optional(),
   count: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().min(1).max(50),
+  offset: z.number().int().min(0).max(10_000),
+  nextOffset: z.number().int().min(0).max(10_000).nullable(),
   results: z.array(registrySearchResultSchema).max(50),
   facets: registrySearchFacetsSchema.optional(),
 });
@@ -260,11 +264,17 @@ export const registrySearchQuerySchema = z.object({
     .optional()
     .default("all"),
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+  offset: z.coerce.number().int().min(0).max(10_000).optional().default(0),
 });
 
 export const registryDiffQuerySchema = z.object({
   since: z.string().trim().max(128).optional().default(""),
   limit: z.coerce.number().int().min(1).max(500).optional().default(100),
+});
+
+export const registryIntegrityQuerySchema = z.object({
+  artifact: z.string().trim().max(160).regex(/^\/?(?:[a-z0-9][a-z0-9._-]*\/)*(?:[a-z0-9][a-z0-9._-]*)$/).optional(),
+  hash: z.string().trim().toLowerCase().regex(/^[a-f0-9]{64}$/).optional(),
 });
 
 export const entryParamsSchema = z.object({
@@ -689,6 +699,7 @@ export const apiRouteDefinitions = {
       binding: "API_REGISTRY_RATE_LIMIT",
     },
   }),
+  "registry.integrity": route({ id: "registry.integrity", method: "GET", path: "/api/registry/integrity", summary: "Registry artifact integrity verification", description: "Lists current registry artifact hashes and verifies submitted artifact/hash pairs against the deployed manifest.", tags: ["Registry"], originCheck: true, querySchema: registryIntegrityQuerySchema, rateLimit: { scope: "registry-integrity", limit: 120, windowMs: 60_000, binding: "API_REGISTRY_RATE_LIMIT" } }),
   "registry.entry": route({
     id: "registry.entry",
     method: "GET",
