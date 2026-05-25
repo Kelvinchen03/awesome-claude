@@ -83,19 +83,21 @@ function CollapsibleSection({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-5 py-4 text-left transition hover:border-primary/40 hover:bg-card/80"
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3.5 text-left transition hover:border-primary/40 hover:bg-card/80 sm:px-5 sm:py-4"
       >
-        <div className="flex items-center gap-3">
-          <Icon className="size-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <div className="flex min-w-0 items-center gap-3">
+          <Icon className="size-5 shrink-0 text-primary" />
+          <h2 className="truncate text-base font-semibold text-foreground sm:text-lg">
+            {title}
+          </h2>
         </div>
         {isOpen ? (
-          <ChevronUp className="size-5 text-muted-foreground transition-transform" />
+          <ChevronUp className="size-5 shrink-0 text-muted-foreground transition-transform" />
         ) : (
-          <ChevronRight className="size-5 text-muted-foreground transition-transform" />
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground transition-transform" />
         )}
       </button>
-      {isOpen && <div className="pl-2">{children}</div>}
+      {isOpen && <div className="pl-0 sm:pl-2">{children}</div>}
     </section>
   );
 }
@@ -103,8 +105,8 @@ function CollapsibleSection({
 export function DesignSystemReferenceClient() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
-        <aside className="sticky top-0 h-screen w-64 border-r border-border/60 bg-card/80 backdrop-blur-lg">
+      <div className="lg:flex">
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border/60 bg-card/80 backdrop-blur-lg lg:block">
           <div className="p-6">
             <span className="eyebrow mb-4 inline-block">Internal</span>
             <h1 className="text-lg font-semibold tracking-tight text-foreground">
@@ -140,14 +142,49 @@ export function DesignSystemReferenceClient() {
           </div>
         </aside>
 
-        <main className="min-h-screen flex-1">
-          <div className="container-shell py-12">
-            <div className="max-w-4xl space-y-6">
+        <main className="min-h-screen min-w-0 flex-1">
+          <div className="sticky top-0 z-20 border-b border-border/60 bg-card/90 backdrop-blur-lg lg:hidden">
+            <div className="container-shell py-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <span className="eyebrow mb-2 inline-block">Internal</span>
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    Design System
+                  </p>
+                </div>
+                <ThemeToggle />
+              </div>
+              <nav
+                aria-label="Design system sections"
+                className="-mx-4 mt-4 overflow-x-auto px-4"
+              >
+                <ul className="flex w-max gap-2 pb-1">
+                  {sections.map((section) => {
+                    const Icon = section.icon;
+                    return (
+                      <li key={section.id}>
+                        <a
+                          href={`#${section.id}`}
+                          className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+                        >
+                          <Icon className="size-3.5" />
+                          {section.title}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div className="container-shell py-8 sm:py-10 lg:py-12">
+            <div className="mx-auto max-w-5xl space-y-6">
               <div className="mb-8 space-y-4">
-                <h1 className="display-title text-foreground">
+                <h1 className="display-title text-balance text-foreground">
                   Design System Reference
                 </h1>
-                <p className="text-lg text-muted-foreground">
+                <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
                   Comprehensive visual reference for design tokens, UI
                   primitives, and component states.
                 </p>
@@ -421,7 +458,7 @@ export function DesignSystemReferenceClient() {
               </CollapsibleSection>
 
               <CollapsibleSection id="inputs" title="Inputs" icon={Box}>
-                <div className="space-y-6 max-w-md">
+                <div className="max-w-md space-y-6">
                   <input
                     type="text"
                     placeholder="Placeholder text"
