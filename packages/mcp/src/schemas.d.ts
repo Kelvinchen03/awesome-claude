@@ -1,5 +1,22 @@
 import type { z } from "zod";
 
+/**
+ * MCP tool input schemas for argument validation.
+ *
+ * Tool output shapes are aligned with the public API contracts defined in
+ * apps/web/src/lib/api/contracts.ts. Shared TypeScript types are available
+ * from packages/registry/src/generated/api-client-types.d.ts:
+ *
+ *   - search_registry        → RegistrySearchResponse
+ *   - get_trending_entries   → RegistryTrendingResponse
+ *   - get_entry_detail       → RegistrySearchResult (single entry)
+ *   - list_category_entries  → RegistrySearchResponse (filtered)
+ *   - get_recent_updates     → RegistrySearchResponse (recent slice)
+ *
+ * When the API contracts change, regenerate shared types with:
+ *   pnpm generate:api-types
+ */
+
 export const SearchRegistryInputSchema: z.ZodType;
 export const ServerInfoInputSchema: z.ZodType;
 export const ListCategoryEntriesInputSchema: z.ZodType;

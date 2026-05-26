@@ -416,6 +416,10 @@ jobs:
         if: ${{ needs.classify-pr.outputs.web == 'true' }}
         run: pnpm validate:openapi
 
+      - name: Validate generated API client types
+        if: ${{ needs.classify-pr.outputs.web == 'true' }}
+        run: pnpm validate:api-types
+
       - name: Run Vitest suite
         if: ${{ needs.classify-pr.outputs.web == 'true' }}
         run: pnpm test

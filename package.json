@@ -27,6 +27,8 @@
     "validate:clean": "node scripts/validate-codebase-clean.mjs",
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "validate:openapi": "tsx scripts/generate-openapi.ts --check",
+    "generate:api-types": "tsx scripts/generate-api-types.ts",
+    "validate:api-types": "tsx scripts/generate-api-types.ts --check",
     "validate:d1-jobs": "node scripts/validate-d1-jobs.mjs",
     "validate:tasks": "node scripts/validate-tasks.mjs",
     "indexnow:submit": "node scripts/submit-indexnow.mjs",

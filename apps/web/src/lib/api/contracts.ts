@@ -119,6 +119,50 @@ export const publicJobsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(100),
 });
 
+export const publicJobItemSchema = z.object({
+  slug: safeSlugSchema,
+  title: z.string().trim().min(1).max(180),
+  company: z.string().trim().min(1).max(160),
+  companyUrl: z.string().optional(),
+  location: z.string().trim().max(160),
+  description: z.string().trim().max(900),
+  descriptionMd: z.string().optional(),
+  type: z.string().optional(),
+  postedAt: z.string().optional(),
+  compensation: z.string().optional(),
+  equity: z.string().optional(),
+  bonus: z.string().optional(),
+  benefits: z.array(z.string()).optional(),
+  responsibilities: z.array(z.string()).optional(),
+  requirements: z.array(z.string()).optional(),
+  featured: z.boolean(),
+  sponsored: z.boolean().optional(),
+  applyUrl: z.string(),
+  tier: jobTierSchema.optional(),
+  source: jobSourceSchema.optional(),
+  sourceKind: jobSourceKindSchema.optional(),
+  sourceUrl: z.string().optional(),
+  firstSeenAt: z.string().optional(),
+  lastCheckedAt: z.string().optional(),
+  sourceCheckedAt: z.string().optional(),
+  curationNote: z.string().optional(),
+  claimedEmployer: z.boolean().optional(),
+  expiresAt: z.string().optional(),
+  isRemote: z.boolean().optional(),
+  isWorldwide: z.boolean().optional(),
+  webUrl: z.string(),
+  labels: z.array(z.string()),
+  sourceLabel: z.string(),
+  applySourceLabel: z.string(),
+  lastVerifiedAt: z.string().optional(),
+});
+
+export const publicJobsResponseSchema = z.object({
+  generatedAt: z.string().optional(),
+  count: z.number().int().nonnegative().optional(),
+  entries: z.array(publicJobItemSchema),
+});
+
 export const apiErrorEnvelopeSchema = z.object({
   ok: z.literal(false),
   error: z.object({
@@ -990,6 +1034,7 @@ export const apiRouteDefinitions = {
     tags: ["Jobs"],
     originCheck: true,
     querySchema: publicJobsQuerySchema,
+    responseSchema: publicJobsResponseSchema,
     rateLimit: {
       scope: "jobs-list",
       limit: 120,
