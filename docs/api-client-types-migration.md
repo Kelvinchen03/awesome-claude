@@ -22,6 +22,15 @@ Raycast has manual type definitions and parsers in:
 - `integrations/raycast/src/feed.ts` - `RaycastEntry` type and `normalizeRaycastEntry` parser
 - `integrations/raycast/src/jobs-feed.ts` - `RaycastJob` type and `normalizeRaycastJob` parser
 
+### Available Shared Types
+
+- `RegistrySearchResponse` - Full search API response
+- `RegistrySearchResult` - Individual registry entry
+- `RegistryTrendingResponse` - Trending entries response
+- `PublicJobItem` - Individual job listing
+- `PublicJobsResponse` - Jobs API response envelope
+- `ApiErrorEnvelope` - Error response shape
+
 ### Migration Path
 
 #### Option 1: Use Shared Types (Recommended for new code)
@@ -124,6 +133,9 @@ The `tests/api-client-contracts.test.ts` file ensures:
 1. Generated types match runtime schemas
 2. Mock API responses parse correctly
 3. Type compatibility is maintained
+4. **Drift-detection:** Raycast parsers accept contract-valid payloads
+5. **Drift-detection:** Raycast parsers preserve contract enum values
+6. **Drift-detection:** Raycast parsers reject payloads missing required fields
 
 Run tests:
 

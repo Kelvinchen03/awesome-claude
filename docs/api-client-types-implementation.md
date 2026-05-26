@@ -34,6 +34,8 @@ pnpm validate:api-types  # Validate types are up-to-date (CI)
 - `RegistryTrustSignals` - Trust/verification signals
 - `RegistrySearchFacets` - Search facets/filters
 - `PublicJobsQuery` - Jobs query parameters
+- `PublicJobItem` - Individual job listing
+- `PublicJobsResponse` - Jobs API response envelope
 - `ApiErrorEnvelope` - Error response shape
 
 ### 3. Contract Tests
@@ -46,6 +48,9 @@ pnpm validate:api-types  # Validate types are up-to-date (CI)
 -  Tests rejection of invalid responses
 -  Verifies type compatibility
 -  Tests optional fields (brand assets, trust signals)
+-  **Drift-detection tests:** Imports Raycast parsers directly and validates they accept contract-valid payloads
+-  **Drift-detection tests:** Validates Raycast parsers preserve contract enum values (e.g., `downloadTrust`)
+-  **Drift-detection tests:** Validates Raycast parsers reject payloads missing required contract fields
 
 **Run:**
 ```bash
@@ -165,9 +170,8 @@ pnpm validate:api-types
 
 ### Immediate (Recommended)
 
-1. Add `pnpm validate:api-types` to CI workflow
-2. Update Raycast parsers to validate against shared schemas
-3. Update MCP tool outputs to use shared types
+1. Update Raycast parsers to validate against shared schemas
+2. Update MCP tool outputs to use shared types
 
 ### Future Enhancements
 
