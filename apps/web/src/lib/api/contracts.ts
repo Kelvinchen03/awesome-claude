@@ -164,7 +164,7 @@ export const publicJobItemSchema = z.object({
   isRemote: z.boolean().optional(),
   isWorldwide: z.boolean().optional(),
   webUrl: z.string(),
-  labels: z.array(z.string()),
+  labels: z.array(z.string()).max(10),
   sourceLabel: z.string(),
   applySourceLabel: z.string(),
   lastVerifiedAt: z.string().optional(),

@@ -500,6 +500,7 @@ components:
                 type: array
                 items:
                   type: string
+                maxItems: 10
               sourceLabel:
                 type: string
               applySourceLabel:

@@ -246,9 +246,13 @@ async function main() {
     if (props.benefits) props.benefits.maxItems = 10;
     if (props.responsibilities) props.responsibilities.maxItems = 10;
     if (props.requirements) props.requirements.maxItems = 10;
+    if (props.labels) props.labels.maxItems = 10;
   }
 
-  const withMaxItems = stringify(parsed, { lineWidth: 100, singleQuote: false });
+  const withMaxItems = stringify(parsed, {
+    lineWidth: 100,
+    singleQuote: false,
+  });
   const generated = await formatWithPrettier(withMaxItems, { parser: "yaml" });
 
   if (process.argv.includes("--check")) {
