@@ -8,7 +8,7 @@ import {
   extendZodWithOpenApi,
 } from "@asteasolutions/zod-to-openapi";
 import { format as formatWithPrettier } from "prettier";
-import { stringify } from "yaml";
+import { stringify, parse as parseYaml } from "yaml";
 import { z } from "zod";
 
 extendZodWithOpenApi(z);
@@ -233,11 +233,22 @@ async function main() {
     lineWidth: 100,
     singleQuote: false,
   })}\n`;
-  // Post-process: add maxItems to PublicJobsResponse entries array for Checkov compliance
-  const withMaxItems = rawGenerated.replace(
-    /(PublicJobsResponse:.*?entries:.*?type: array\n)(\s+items:)/gm,
-    "$1$1maxItems: 100\n$2",
-  );
+  const parsed = parseYaml(rawGenerated) as any;
+
+  // Add maxItems to PublicJobsResponse entries array
+  if (parsed?.components?.schemas?.PublicJobsResponse?.properties?.entries) {
+    parsed.components.schemas.PublicJobsResponse.properties.entries.maxItems = 100;
+  }
+
+  // Add maxItems to job item arrays
+  if (parsed?.components?.schemas?.PublicJobItem?.properties) {
+    const props = parsed.components.schemas.PublicJobItem.properties;
+    if (props.benefits) props.benefits.maxItems = 10;
+    if (props.responsibilities) props.responsibilities.maxItems = 10;
+    if (props.requirements) props.requirements.maxItems = 10;
+  }
+
+  const withMaxItems = stringify(parsed, { lineWidth: 100, singleQuote: false });
   const generated = await formatWithPrettier(withMaxItems, { parser: "yaml" });
 
   if (process.argv.includes("--check")) {

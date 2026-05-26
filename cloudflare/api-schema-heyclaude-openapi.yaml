@@ -439,14 +439,17 @@ components:
                 type: array
                 items:
                   type: string
+                maxItems: 10
               responsibilities:
                 type: array
                 items:
                   type: string
+                maxItems: 10
               requirements:
                 type: array
                 items:
                   type: string
+                maxItems: 10
               featured:
                 type: boolean
               sponsored:
