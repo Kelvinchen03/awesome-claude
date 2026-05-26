@@ -4,8 +4,21 @@ import { validateJobPublicationQuality } from "@heyclaude/registry/commercial";
 
 const entryKeySchema = z.string().regex(/^[a-z0-9-]+:[a-z0-9-]+$/);
 const safeSlugSchema = z.string().regex(/^[a-z0-9-]+$/);
-const categorySchema = z.union([safeSlugSchema, z.literal("")]).optional().default("");
-const platformSchema = z.union([z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9 -]{0,48}$/), z.literal("")]).optional().default("");
+const categorySchema = z
+  .union([safeSlugSchema, z.literal("")])
+  .optional()
+  .default("");
+const platformSchema = z
+  .union([
+    z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z0-9][a-z0-9 -]{0,48}$/),
+    z.literal(""),
+  ])
+  .optional()
+  .default("");
 const jobTierSchema = z.enum(["free", "standard", "featured", "sponsored"]);
 const jobStatusSchema = z.enum([
   "draft",
@@ -160,7 +173,7 @@ export const publicJobItemSchema = z.object({
 export const publicJobsResponseSchema = z.object({
   generatedAt: z.string().optional(),
   count: z.number().int().nonnegative().optional(),
-  entries: z.array(publicJobItemSchema),
+  entries: z.array(publicJobItemSchema).max(100),
 });
 
 export const apiErrorEnvelopeSchema = z.object({
@@ -290,8 +303,28 @@ export const registryTrendingResponseSchema = z.object({
   platform: z.string(),
   limit: z.number().int().min(1).max(50),
   count: z.number().int().nonnegative(),
-  signalsAvailable: z.object({ votes: z.boolean(), community: z.boolean(), intent: z.boolean() }),
-  entries: z.array(z.object({ category: z.string(), slug: z.string(), title: z.string(), description: z.string(), canonicalUrl: z.string().url().optional(), platforms: z.array(z.string()).max(12), tags: z.array(z.string()).max(32), dateAdded: z.string(), score: z.number(), reasons: z.array(z.string()).max(6), trustSignals: z.object({ sourceStatus: z.string() }) })).max(50),
+  signalsAvailable: z.object({
+    votes: z.boolean(),
+    community: z.boolean(),
+    intent: z.boolean(),
+  }),
+  entries: z
+    .array(
+      z.object({
+        category: z.string(),
+        slug: z.string(),
+        title: z.string(),
+        description: z.string(),
+        canonicalUrl: z.string().url().optional(),
+        platforms: z.array(z.string()).max(12),
+        tags: z.array(z.string()).max(32),
+        dateAdded: z.string(),
+        score: z.number(),
+        reasons: z.array(z.string()).max(6),
+        trustSignals: z.object({ sourceStatus: z.string() }),
+      }),
+    )
+    .max(50),
 });
 
 export const registrySearchQuerySchema = z.object({
@@ -1035,6 +1068,7 @@ export const apiRouteDefinitions = {
     originCheck: true,
     querySchema: publicJobsQuerySchema,
     responseSchema: publicJobsResponseSchema,
+    responseSchemaName: "PublicJobsResponse",
     rateLimit: {
       scope: "jobs-list",
       limit: 120,

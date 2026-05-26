@@ -5,6 +5,7 @@ This directory contains auto-generated TypeScript types derived from the API con
 ## Purpose
 
 These types provide a shared contract between:
+
 - **Raycast extension** (`integrations/raycast`) - for parsing registry feed responses
 - **MCP server package** (`packages/mcp`) - for tool output type safety
 

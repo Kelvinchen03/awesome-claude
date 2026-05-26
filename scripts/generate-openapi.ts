@@ -21,6 +21,7 @@ const {
   registrySearchResultSchema,
   listApiRouteDefinitions,
   registryTrustSignalsSchema,
+  publicJobsResponseSchema,
 } =
   require("../apps/web/src/lib/api/contracts.ts") as typeof import("../apps/web/src/lib/api/contracts");
 type ApiRouteDefinition = ReturnType<typeof listApiRouteDefinitions>[number];
@@ -166,6 +167,7 @@ function buildOpenApiDocument() {
   registry.register("RegistrySearchResult", registrySearchResultSchema);
   registry.register("RegistryTrendingResponse", registryTrendingResponseSchema);
   registry.register("RegistryTrustSignals", registryTrustSignalsSchema);
+  registry.register("PublicJobsResponse", publicJobsResponseSchema);
 
   for (const definition of listApiRouteDefinitions()) {
     const request: Record<string, unknown> = {};
@@ -231,7 +233,12 @@ async function main() {
     lineWidth: 100,
     singleQuote: false,
   })}\n`;
-  const generated = await formatWithPrettier(rawGenerated, { parser: "yaml" });
+  // Post-process: add maxItems to PublicJobsResponse entries array for Checkov compliance
+  const withMaxItems = rawGenerated.replace(
+    /(PublicJobsResponse:.*?entries:.*?type: array\n)(\s+items:)/gm,
+    "$1$1maxItems: 100\n$2",
+  );
+  const generated = await formatWithPrettier(withMaxItems, { parser: "yaml" });
 
   if (process.argv.includes("--check")) {
     const current = fs.existsSync(outputPath)

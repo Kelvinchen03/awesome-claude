@@ -391,6 +391,133 @@ components:
           items:
             type: string
           maxItems: 12
+    PublicJobsResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              slug:
+                type: string
+                pattern: ^[a-z0-9-]+$
+              title:
+                type: string
+                minLength: 1
+                maxLength: 180
+              company:
+                type: string
+                minLength: 1
+                maxLength: 160
+              companyUrl:
+                type: string
+              location:
+                type: string
+                maxLength: 160
+              description:
+                type: string
+                maxLength: 900
+              descriptionMd:
+                type: string
+              type:
+                type: string
+              postedAt:
+                type: string
+              compensation:
+                type: string
+              equity:
+                type: string
+              bonus:
+                type: string
+              benefits:
+                type: array
+                items:
+                  type: string
+              responsibilities:
+                type: array
+                items:
+                  type: string
+              requirements:
+                type: array
+                items:
+                  type: string
+              featured:
+                type: boolean
+              sponsored:
+                type: boolean
+              applyUrl:
+                type: string
+              tier:
+                type: string
+                enum:
+                  - free
+                  - standard
+                  - featured
+                  - sponsored
+              source:
+                type: string
+                enum:
+                  - manual
+                  - polar
+                  - email
+                  - curated
+              sourceKind:
+                type: string
+                enum:
+                  - official_ats
+                  - employer_careers
+                  - employer_submitted
+              sourceUrl:
+                type: string
+              firstSeenAt:
+                type: string
+              lastCheckedAt:
+                type: string
+              sourceCheckedAt:
+                type: string
+              curationNote:
+                type: string
+              claimedEmployer:
+                type: boolean
+              expiresAt:
+                type: string
+              isRemote:
+                type: boolean
+              isWorldwide:
+                type: boolean
+              webUrl:
+                type: string
+              labels:
+                type: array
+                items:
+                  type: string
+              sourceLabel:
+                type: string
+              applySourceLabel:
+                type: string
+              lastVerifiedAt:
+                type: string
+            required:
+              - slug
+              - title
+              - company
+              - location
+              - description
+              - featured
+              - applyUrl
+              - webUrl
+              - labels
+              - sourceLabel
+              - applySourceLabel
+          maxItems: 100
+      required:
+        - entries
   parameters: {}
 paths:
   /api/registry/manifest:
@@ -6214,131 +6341,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  generatedAt:
-                    type: string
-                  count:
-                    type: integer
-                    minimum: 0
-                  entries:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        slug:
-                          type: string
-                          pattern: ^[a-z0-9-]+$
-                        title:
-                          type: string
-                          minLength: 1
-                          maxLength: 180
-                        company:
-                          type: string
-                          minLength: 1
-                          maxLength: 160
-                        companyUrl:
-                          type: string
-                        location:
-                          type: string
-                          maxLength: 160
-                        description:
-                          type: string
-                          maxLength: 900
-                        descriptionMd:
-                          type: string
-                        type:
-                          type: string
-                        postedAt:
-                          type: string
-                        compensation:
-                          type: string
-                        equity:
-                          type: string
-                        bonus:
-                          type: string
-                        benefits:
-                          type: array
-                          items:
-                            type: string
-                        responsibilities:
-                          type: array
-                          items:
-                            type: string
-                        requirements:
-                          type: array
-                          items:
-                            type: string
-                        featured:
-                          type: boolean
-                        sponsored:
-                          type: boolean
-                        applyUrl:
-                          type: string
-                        tier:
-                          type: string
-                          enum:
-                            - free
-                            - standard
-                            - featured
-                            - sponsored
-                        source:
-                          type: string
-                          enum:
-                            - manual
-                            - polar
-                            - email
-                            - curated
-                        sourceKind:
-                          type: string
-                          enum:
-                            - official_ats
-                            - employer_careers
-                            - employer_submitted
-                        sourceUrl:
-                          type: string
-                        firstSeenAt:
-                          type: string
-                        lastCheckedAt:
-                          type: string
-                        sourceCheckedAt:
-                          type: string
-                        curationNote:
-                          type: string
-                        claimedEmployer:
-                          type: boolean
-                        expiresAt:
-                          type: string
-                        isRemote:
-                          type: boolean
-                        isWorldwide:
-                          type: boolean
-                        webUrl:
-                          type: string
-                        labels:
-                          type: array
-                          items:
-                            type: string
-                        sourceLabel:
-                          type: string
-                        applySourceLabel:
-                          type: string
-                        lastVerifiedAt:
-                          type: string
-                      required:
-                        - slug
-                        - title
-                        - company
-                        - location
-                        - description
-                        - featured
-                        - applyUrl
-                        - webUrl
-                        - labels
-                        - sourceLabel
-                        - applySourceLabel
-                required:
-                  - entries
+                $ref: "#/components/schemas/PublicJobsResponse"
         "400":
           description: Invalid JSON, invalid query, invalid payload, or invalid status transition.
           content:

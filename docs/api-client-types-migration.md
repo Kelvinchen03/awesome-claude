@@ -19,6 +19,7 @@ packages/registry/src/generated/api-client-types.d.ts
 ### Current State
 
 Raycast has manual type definitions and parsers in:
+
 - `integrations/raycast/src/feed.ts` - `RaycastEntry` type and `normalizeRaycastEntry` parser
 - `integrations/raycast/src/jobs-feed.ts` - `RaycastJob` type and `normalizeRaycastJob` parser
 

@@ -2,7 +2,7 @@
 
 **Issue:** [#499 - Generate shared typed clients for Raycast and MCP](https://github.com/JSONbored/awesome-claude/issues/499)
 
-**Status:**  Core infrastructure complete, ready for gradual migration
+**Status:** Core infrastructure complete, ready for gradual migration
 
 ## What Was Implemented
 
@@ -16,6 +16,7 @@
 - Source of truth: `apps/web/src/lib/api/contracts.ts`
 
 **Commands:**
+
 ```bash
 pnpm generate:api-types  # Generate types
 pnpm validate:api-types  # Validate types are up-to-date (CI)
@@ -26,6 +27,7 @@ pnpm validate:api-types  # Validate types are up-to-date (CI)
 **File:** `packages/registry/src/generated/api-client-types.d.ts`
 
 **Exported Types:**
+
 - `RegistrySearchResponse` - Full search API response
 - `RegistrySearchResult` - Individual registry entry
 - `RegistryTrendingResponse` - Trending entries response
@@ -43,16 +45,18 @@ pnpm validate:api-types  # Validate types are up-to-date (CI)
 **File:** `tests/api-client-contracts.test.ts`
 
 **Coverage:**
--  Validates generated types match runtime schemas
--  Tests parsing of valid API responses
--  Tests rejection of invalid responses
--  Verifies type compatibility
--  Tests optional fields (brand assets, trust signals)
--  **Drift-detection tests:** Imports Raycast parsers directly and validates they accept contract-valid payloads
--  **Drift-detection tests:** Validates Raycast parsers preserve contract enum values (e.g., `downloadTrust`)
--  **Drift-detection tests:** Validates Raycast parsers reject payloads missing required contract fields
+
+- Validates generated types match runtime schemas
+- Tests parsing of valid API responses
+- Tests rejection of invalid responses
+- Verifies type compatibility
+- Tests optional fields (brand assets, trust signals)
+- **Drift-detection tests:** Imports Raycast parsers directly and validates they accept contract-valid payloads
+- **Drift-detection tests:** Validates Raycast parsers preserve contract enum values (e.g., `downloadTrust`)
+- **Drift-detection tests:** Validates Raycast parsers reject payloads missing required contract fields
 
 **Run:**
+
 ```bash
 pnpm test tests/api-client-contracts.test.ts
 ```
@@ -60,6 +64,7 @@ pnpm test tests/api-client-contracts.test.ts
 ### 4. Documentation
 
 **Files:**
+
 - `packages/registry/src/generated/README.md` - Usage guide
 - `docs/api-client-types-migration.md` - Migration guide for Raycast/MCP
 - `docs/api-client-types-implementation.md` - This file
@@ -68,33 +73,35 @@ pnpm test tests/api-client-contracts.test.ts
 
 From issue #499:
 
-###  API response shape changes are caught by client contract tests
+### API response shape changes are caught by client contract tests
 
 - Contract tests validate types against schemas
 - CI runs `pnpm validate:api-types` to catch stale types
 - Tests fail if contracts change without regeneration
 
-###  Raycast and MCP consume shared types where practical
+### Raycast and MCP consume shared types where practical
 
 **Status:** Infrastructure ready, migration pending
 
 **Raycast:**
+
 - Can import types from `@heyclaude/registry/generated/api-client-types`
 - Migration path documented in `docs/api-client-types-migration.md`
 - Existing parsers can be gradually updated
 
 **MCP:**
+
 - Can use types for tool output type safety
 - Types are type-only imports (no runtime dependency)
 - MCP package remains self-contained
 
-###  The published MCP package remains self-contained and publishable
+### The published MCP package remains self-contained and publishable
 
 - Generated types use `import type` (compile-time only)
 - No runtime dependency on workspace packages
 - MCP can bundle types if needed
 
-###  OpenAPI validation remains deterministic
+### OpenAPI validation remains deterministic
 
 - `pnpm validate:openapi` still passes
 - OpenAPI generation unchanged
@@ -184,6 +191,7 @@ pnpm validate:api-types
 ## Files Changed
 
 ### New Files
+
 - `scripts/generate-api-types.ts` - Type generation script
 - `packages/registry/src/generated/api-client-types.d.ts` - Generated types
 - `packages/registry/src/generated/README.md` - Usage documentation
@@ -192,6 +200,7 @@ pnpm validate:api-types
 - `docs/api-client-types-implementation.md` - This summary
 
 ### Modified Files
+
 - `package.json` - Added `generate:api-types` and `validate:api-types` scripts
 - `cloudflare/api-schema-heyclaude-openapi.yaml` - Regenerated (no schema changes)
 
@@ -221,11 +230,11 @@ git diff --check
 
 The core infrastructure for shared API client types is complete and tested. The implementation:
 
--  Generates types from canonical API contracts
--  Validates types in CI
--  Provides contract tests
--  Documents migration path
--  Maintains MCP package independence
--  Preserves OpenAPI validation
+- Generates types from canonical API contracts
+- Validates types in CI
+- Provides contract tests
+- Documents migration path
+- Maintains MCP package independence
+- Preserves OpenAPI validation
 
 Raycast and MCP can now gradually migrate to use these shared types, with CI catching any drift between backend contracts and client code.

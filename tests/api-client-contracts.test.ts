@@ -155,8 +155,12 @@ describe("Raycast jobs parser drift detection", () => {
   });
 
   it("normalizeRaycastJob rejects a payload missing required contract fields", () => {
-    const { webUrl: _w, sourceLabel: _s, applySourceLabel: _a, ...stripped } =
-      minimalValidJob;
+    const {
+      webUrl: _w,
+      sourceLabel: _s,
+      applySourceLabel: _a,
+      ...stripped
+    } = minimalValidJob;
     expect(normalizeRaycastJob(stripped)).toBeNull();
   });
 
@@ -208,7 +212,9 @@ describe("Raycast feed parser drift detection", () => {
 
   it("normalizeRaycastEntry rejects entries missing required shared fields", () => {
     expect(normalizeEntry({ title: "Missing required fields" })).toBeNull();
-    expect(normalizeEntry({ category: "mcp", slug: "no-description" })).toBeNull();
+    expect(
+      normalizeEntry({ category: "mcp", slug: "no-description" }),
+    ).toBeNull();
   });
 
   it("normalizeRaycastEntry preserves downloadTrust values from contract enum", () => {
