@@ -10,6 +10,25 @@ export const metadata: Metadata = buildPageMetadata({
   robots: { index: false, follow: false },
 });
 
+function writeLog(
+  level: "info" | "error",
+  event: string,
+  meta: Record<string, unknown> = {},
+) {
+  const payload = {
+    ts: new Date().toISOString(),
+    level,
+    event,
+    ...meta,
+  };
+  const line = JSON.stringify(payload);
+  if (level === "error") {
+    console.error(line);
+    return;
+  }
+  console.info(line);
+}
+
 function CodeBlock({ children }: { children: React.ReactNode }) {
   return (
     <pre className="mt-2 max-w-full overflow-x-auto rounded-xl border border-border bg-card p-3 text-xs leading-6 text-foreground sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-7">
@@ -63,6 +82,10 @@ function InlineCode({ children }: { children: React.ReactNode }) {
 }
 
 export default function ScreenshotQaPage() {
+  writeLog("info", "design-system-qa-page-render", {
+    path: "/design-system/qa",
+  });
+
   return (
     <div className="container-shell max-w-4xl space-y-8 py-8 sm:space-y-10 sm:py-12">
       <div className="space-y-4 border-b border-border/80 pb-6 sm:pb-8">
@@ -94,33 +117,33 @@ export default function ScreenshotQaPage() {
         <Ul>
           <Li>
             <strong className="text-foreground">Home</strong> —{" "}
-            <InlineCode>/</InlineCode>{" "}
-            Hero, stats grid, directory preview, and footer.
+            <InlineCode>/</InlineCode> Hero, stats grid, directory preview, and
+            footer.
           </Li>
           <Li>
             <strong className="text-foreground">Browse</strong> —{" "}
-            <InlineCode>/browse</InlineCode>{" "}
-            Directory listing, search bar, filters, and cards.
+            <InlineCode>/browse</InlineCode> Directory listing, search bar,
+            filters, and cards.
           </Li>
           <Li>
             <strong className="text-foreground">Detail</strong> —{" "}
-            <InlineCode>/:category/:slug</InlineCode>{" "}
-            Entry detail page with markdown prose, related cards, and vote rail.
+            <InlineCode>/:category/:slug</InlineCode> Entry detail page with
+            markdown prose, related cards, and vote rail.
           </Li>
           <Li>
             <strong className="text-foreground">Submit</strong> —{" "}
-            <InlineCode>/submit</InlineCode>{" "}
-            Submission form, preview card, and readiness check.
+            <InlineCode>/submit</InlineCode> Submission form, preview card, and
+            readiness check.
           </Li>
           <Li>
             <strong className="text-foreground">Quality</strong> —{" "}
-            <InlineCode>/quality</InlineCode>{" "}
-            Quality signals, provenance, and SEO checklist.
+            <InlineCode>/quality</InlineCode> Quality signals, provenance, and
+            SEO checklist.
           </Li>
           <Li>
             <strong className="text-foreground">Submissions</strong> —{" "}
-            <InlineCode>/submissions</InlineCode>{" "}
-            Submission queue and editorial status.
+            <InlineCode>/submissions</InlineCode> Submission queue and editorial
+            status.
           </Li>
         </Ul>
       </section>
@@ -198,18 +221,17 @@ test("browse page matches visual reference", async ({ page }) => {
         <H2>Thresholds &amp; Tolerance</H2>
         <Ul>
           <Li>
-            Default pixel diff ratio:{" "}
-            <InlineCode>0.2</InlineCode>
+            Default pixel diff ratio: <InlineCode>0.2</InlineCode>
           </Li>
           <Li>
             Animations are disabled during capture via{" "}
-            <InlineCode>caret-color: transparent</InlineCode>{" "}
-            and reduced-motion emulation.
+            <InlineCode>caret-color: transparent</InlineCode> and reduced-motion
+            emulation.
           </Li>
           <Li>
             Dynamic content (e.g., live GitHub stars) is stubbed or hidden with{" "}
-            <InlineCode>data-testid="screenshot-stable"</InlineCode>{" "}
-            wrappers where possible.
+            <InlineCode>data-testid="screenshot-stable"</InlineCode> wrappers
+            where possible.
           </Li>
         </Ul>
       </section>
@@ -227,10 +249,10 @@ test("browse page matches visual reference", async ({ page }) => {
       <section className="space-y-4">
         <H2>CI Integration</H2>
         <P>
-          CI should run screenshot QA after the build step and before
-          deployment once baselines are established. Until that maintainer gate
-          exists, generated screenshots can be uploaded as review artifacts
-          without blocking deployment.
+          CI should run screenshot QA after the build step and before deployment
+          once baselines are established. Until that maintainer gate exists,
+          generated screenshots can be uploaded as review artifacts without
+          blocking deployment.
         </P>
       </section>
     </div>
