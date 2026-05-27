@@ -10,15 +10,22 @@ export const metadata: Metadata = buildPageMetadata({
   robots: { index: false, follow: false },
 });
 
-function writeLog(
+type PageLogger = {
+  info: (event: string, meta?: Record<string, unknown>) => void;
+  error: (event: string, meta?: Record<string, unknown>) => void;
+};
+
+function writePageLog(
   level: "info" | "error",
   event: string,
+  requestId: string,
   meta: Record<string, unknown> = {},
 ) {
   const payload = {
     ts: new Date().toISOString(),
     level,
     event,
+    requestId,
     ...meta,
   };
   const line = JSON.stringify(payload);
@@ -27,6 +34,40 @@ function writeLog(
     return;
   }
   console.info(line);
+}
+
+function createLogger(requestId: string): PageLogger {
+  return {
+    info(event, meta = {}) {
+      writePageLog("info", event, requestId, meta);
+    },
+    error(event, meta = {}) {
+      writePageLog("error", event, requestId, meta);
+    },
+  };
+}
+
+async function withDuration<T>(
+  callback: (context: {
+    getDurationMs: () => number;
+    logger: PageLogger;
+    requestId: string;
+  }) => Promise<T>,
+) {
+  const startedAt = Date.now();
+  const requestId = crypto.randomUUID();
+  const logger = createLogger(requestId);
+  const getDurationMs = () => Date.now() - startedAt;
+
+  try {
+    return await callback({ getDurationMs, logger, requestId });
+  } catch (error) {
+    logger.error("design-system.qa.page.failed", {
+      durationMs: getDurationMs(),
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    throw error;
+  }
 }
 
 function CodeBlock({ children }: { children: React.ReactNode }) {
@@ -81,126 +122,128 @@ function InlineCode({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ScreenshotQaPage() {
-  writeLog("info", "design-system-qa-page-render", {
-    path: "/design-system/qa",
-  });
+export default async function ScreenshotQaPage() {
+  return withDuration(async ({ getDurationMs, logger }) => {
+    logger.info("design-system.qa.page.summary", {
+      durationMs: getDurationMs(),
+    });
 
-  return (
-    <div className="container-shell max-w-4xl space-y-8 py-8 sm:space-y-10 sm:py-12">
-      <div className="space-y-4 border-b border-border/80 pb-6 sm:pb-8">
-        <span className="eyebrow">Internal</span>
-        <h1 className="section-title text-balance">Screenshot QA Process</h1>
-        <P>
-          This page documents the intended visual regression workflow for
-          HeyClaude. The current screenshot paths are advisory until maintainers
-          establish deterministic baselines.
-        </P>
-      </div>
-
-      <section className="space-y-4">
-        <H2>Overview</H2>
-        <P>
-          Screenshot QA will prevent unintended visual regressions by capturing
-          baseline images of key views and comparing them against subsequent
-          builds. Until baselines are committed and CI gates are enabled, use
-          this page as process guidance rather than an enforced release check.
-        </P>
-      </section>
-
-      <section className="space-y-4">
-        <H2>Target Views</H2>
-        <P>
-          The following routes are the recommended baseline candidates once the
-          screenshot suite is activated:
-        </P>
-        <Ul>
-          <Li>
-            <strong className="text-foreground">Home</strong> —{" "}
-            <InlineCode>/</InlineCode> Hero, stats grid, directory preview, and
-            footer.
-          </Li>
-          <Li>
-            <strong className="text-foreground">Browse</strong> —{" "}
-            <InlineCode>/browse</InlineCode> Directory listing, search bar,
-            filters, and cards.
-          </Li>
-          <Li>
-            <strong className="text-foreground">Detail</strong> —{" "}
-            <InlineCode>/:category/:slug</InlineCode> Entry detail page with
-            markdown prose, related cards, and vote rail.
-          </Li>
-          <Li>
-            <strong className="text-foreground">Submit</strong> —{" "}
-            <InlineCode>/submit</InlineCode> Submission form, preview card, and
-            readiness check.
-          </Li>
-          <Li>
-            <strong className="text-foreground">Quality</strong> —{" "}
-            <InlineCode>/quality</InlineCode> Quality signals, provenance, and
-            SEO checklist.
-          </Li>
-          <Li>
-            <strong className="text-foreground">Submissions</strong> —{" "}
-            <InlineCode>/submissions</InlineCode> Submission queue and editorial
-            status.
-          </Li>
-        </Ul>
-      </section>
-
-      <section className="space-y-4">
-        <H2>Viewport Sizes</H2>
-        <P>Use these viewport configurations for comparable captures:</P>
-        <Ul>
-          <Li>
-            <strong className="text-foreground">Desktop</strong> — 1920×1080
-            (Chromium, full window)
-          </Li>
-          <Li>
-            <strong className="text-foreground">Mobile</strong> — 375×667
-            (iPhone SE / small viewport)
-          </Li>
-        </Ul>
-      </section>
-
-      <section className="space-y-4">
-        <H2>Running Tests</H2>
-
-        <div className="space-y-2">
-          <H3>Update baselines</H3>
+    return (
+      <div className="container-shell max-w-4xl space-y-8 py-8 sm:space-y-10 sm:py-12">
+        <div className="space-y-4 border-b border-border/80 pb-6 sm:pb-8">
+          <span className="eyebrow">Internal</span>
+          <h1 className="section-title text-balance">Screenshot QA Process</h1>
           <P>
-            Run after intentional design changes once baselines exist and are
-            part of the repository:
+            This page documents the intended visual regression workflow for
+            HeyClaude. The current screenshot paths are advisory until
+            maintainers establish deterministic baselines.
           </P>
-          <CodeBlock>{`npx playwright test --update-snapshots`}</CodeBlock>
         </div>
 
-        <div className="space-y-2">
-          <H3>Run comparison only</H3>
+        <section className="space-y-4">
+          <H2>Overview</H2>
           <P>
-            Compare against stored baselines after the placeholder spec is
-            replaced with real screenshot assertions:
+            Screenshot QA will prevent unintended visual regressions by
+            capturing baseline images of key views and comparing them against
+            subsequent builds. Until baselines are committed and CI gates are
+            enabled, use this page as process guidance rather than an enforced
+            release check.
           </P>
-          <CodeBlock>{`npx playwright test tests/e2e/screenshot-qa.spec.ts`}</CodeBlock>
-        </div>
+        </section>
 
-        <div className="space-y-2">
-          <H3>Run with UI mode</H3>
-          <P>Useful for debugging failures side-by-side:</P>
-          <CodeBlock>{`npx playwright test --ui`}</CodeBlock>
-        </div>
+        <section className="space-y-4">
+          <H2>Target Views</H2>
+          <P>
+            The following routes are the recommended baseline candidates once
+            the screenshot suite is activated:
+          </P>
+          <Ul>
+            <Li>
+              <strong className="text-foreground">Home</strong> —{" "}
+              <InlineCode>/</InlineCode> Hero, stats grid, directory preview,
+              and footer.
+            </Li>
+            <Li>
+              <strong className="text-foreground">Browse</strong> —{" "}
+              <InlineCode>/browse</InlineCode> Directory listing, search bar,
+              filters, and cards.
+            </Li>
+            <Li>
+              <strong className="text-foreground">Detail</strong> —{" "}
+              <InlineCode>/:category/:slug</InlineCode> Entry detail page with
+              markdown prose, related cards, and vote rail.
+            </Li>
+            <Li>
+              <strong className="text-foreground">Submit</strong> —{" "}
+              <InlineCode>/submit</InlineCode> Submission form, preview card,
+              and readiness check.
+            </Li>
+            <Li>
+              <strong className="text-foreground">Quality</strong> —{" "}
+              <InlineCode>/quality</InlineCode> Quality signals, provenance, and
+              SEO checklist.
+            </Li>
+            <Li>
+              <strong className="text-foreground">Submissions</strong> —{" "}
+              <InlineCode>/submissions</InlineCode> Submission queue and
+              editorial status.
+            </Li>
+          </Ul>
+        </section>
 
-        <div className="space-y-2">
-          <H3>Run against a deployed preview</H3>
-          <P>Point tests to a staging or preview URL:</P>
-          <CodeBlock>{`PLAYWRIGHT_BASE_URL=https://preview.heyclau.de npx playwright test tests/e2e/screenshot-qa.spec.ts`}</CodeBlock>
-        </div>
-      </section>
+        <section className="space-y-4">
+          <H2>Viewport Sizes</H2>
+          <P>Use these viewport configurations for comparable captures:</P>
+          <Ul>
+            <Li>
+              <strong className="text-foreground">Desktop</strong> — 1920×1080
+              (Chromium, full window)
+            </Li>
+            <Li>
+              <strong className="text-foreground">Mobile</strong> — 375×667
+              (iPhone SE / small viewport)
+            </Li>
+          </Ul>
+        </section>
 
-      <section className="space-y-4">
-        <H2>Test Structure Example</H2>
-        <P>A minimal Playwright spec using screenshot comparison:</P>
-        <CodeBlock>{`import { test, expect } from "@playwright/test";
+        <section className="space-y-4">
+          <H2>Running Tests</H2>
+
+          <div className="space-y-2">
+            <H3>Update baselines</H3>
+            <P>
+              Run after intentional design changes once baselines exist and are
+              part of the repository:
+            </P>
+            <CodeBlock>{`npx playwright test --update-snapshots`}</CodeBlock>
+          </div>
+
+          <div className="space-y-2">
+            <H3>Run comparison only</H3>
+            <P>
+              Compare against stored baselines after the placeholder spec is
+              replaced with real screenshot assertions:
+            </P>
+            <CodeBlock>{`npx playwright test tests/e2e/screenshot-qa.spec.ts`}</CodeBlock>
+          </div>
+
+          <div className="space-y-2">
+            <H3>Run with UI mode</H3>
+            <P>Useful for debugging failures side-by-side:</P>
+            <CodeBlock>{`npx playwright test --ui`}</CodeBlock>
+          </div>
+
+          <div className="space-y-2">
+            <H3>Run against a deployed preview</H3>
+            <P>Point tests to a staging or preview URL:</P>
+            <CodeBlock>{`PLAYWRIGHT_BASE_URL=https://preview.heyclau.de npx playwright test tests/e2e/screenshot-qa.spec.ts`}</CodeBlock>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <H2>Test Structure Example</H2>
+          <P>A minimal Playwright spec using screenshot comparison:</P>
+          <CodeBlock>{`import { test, expect } from "@playwright/test";
 
 test("home page matches visual reference", async ({ page }) => {
   await page.goto("/");
@@ -215,46 +258,47 @@ test("browse page matches visual reference", async ({ page }) => {
     fullPage: true,
   });
 });`}</CodeBlock>
-      </section>
+        </section>
 
-      <section className="space-y-4">
-        <H2>Thresholds &amp; Tolerance</H2>
-        <Ul>
-          <Li>
-            Default pixel diff ratio: <InlineCode>0.2</InlineCode>
-          </Li>
-          <Li>
-            Animations are disabled during capture via{" "}
-            <InlineCode>caret-color: transparent</InlineCode> and reduced-motion
-            emulation.
-          </Li>
-          <Li>
-            Dynamic content (e.g., live GitHub stars) is stubbed or hidden with{" "}
-            <InlineCode>data-testid="screenshot-stable"</InlineCode> wrappers
-            where possible.
-          </Li>
-        </Ul>
-      </section>
+        <section className="space-y-4">
+          <H2>Thresholds &amp; Tolerance</H2>
+          <Ul>
+            <Li>
+              Default pixel diff ratio: <InlineCode>0.2</InlineCode>
+            </Li>
+            <Li>
+              Animations are disabled during capture via{" "}
+              <InlineCode>caret-color: transparent</InlineCode> and
+              reduced-motion emulation.
+            </Li>
+            <Li>
+              Dynamic content (e.g., live GitHub stars) is stubbed or hidden
+              with <InlineCode>data-testid="screenshot-stable"</InlineCode>{" "}
+              wrappers where possible.
+            </Li>
+          </Ul>
+        </section>
 
-      <section className="space-y-4">
-        <H2>Baseline Storage</H2>
-        <P>
-          Baseline screenshots should be committed only after maintainers choose
-          deterministic capture settings. Until then, paths such as{" "}
-          <InlineCode>tests/__screenshots__/</InlineCode> are documentation
-          examples rather than required repository contents.
-        </P>
-      </section>
+        <section className="space-y-4">
+          <H2>Baseline Storage</H2>
+          <P>
+            Baseline screenshots should be committed only after maintainers
+            choose deterministic capture settings. Until then, paths such as{" "}
+            <InlineCode>tests/__screenshots__/</InlineCode> are documentation
+            examples rather than required repository contents.
+          </P>
+        </section>
 
-      <section className="space-y-4">
-        <H2>CI Integration</H2>
-        <P>
-          CI should run screenshot QA after the build step and before deployment
-          once baselines are established. Until that maintainer gate exists,
-          generated screenshots can be uploaded as review artifacts without
-          blocking deployment.
-        </P>
-      </section>
-    </div>
-  );
+        <section className="space-y-4">
+          <H2>CI Integration</H2>
+          <P>
+            CI should run screenshot QA after the build step and before
+            deployment once baselines are established. Until that maintainer
+            gate exists, generated screenshots can be uploaded as review
+            artifacts without blocking deployment.
+          </P>
+        </section>
+      </div>
+    );
+  });
 }
