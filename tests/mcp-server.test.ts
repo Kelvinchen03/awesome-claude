@@ -7,6 +7,7 @@ import { createRemoteMcpProxyServerFromClient } from "../packages/mcp/src/remote
 import { createHeyClaudeMcpServer } from "../packages/mcp/src/server.js";
 import {
   callRegistryTool,
+  getClientSetup,
   getRegistryPrompt,
   listRegistryPrompts,
   listRegistryResources,
@@ -954,6 +955,44 @@ describe("HeyClaude read-only MCP helpers", () => {
         },
       },
       policy: { createsIssues: false },
+    });
+  });
+
+  it("rejects non-HTTPS custom endpoint URLs for client setup", async () => {
+    const setup = await callRegistryTool(
+      "get_client_setup",
+      { endpointUrl: "http://evil.example/mcp" },
+      { dataDir },
+    );
+    expect(setup).toMatchObject({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "MCP endpoint URL must use HTTPS outside localhost.",
+      },
+    });
+  });
+
+  it("rejects explicit empty endpoint URLs for client setup", async () => {
+    const setup = await callRegistryTool(
+      "get_client_setup",
+      { endpointUrl: "" },
+      { dataDir },
+    );
+    expect(setup).toMatchObject({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "Invalid HeyClaude MCP tool arguments.",
+      },
+    });
+
+    await expect(getClientSetup({ endpointUrl: "" })).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "MCP endpoint URL is required.",
+      },
     });
   });
 
