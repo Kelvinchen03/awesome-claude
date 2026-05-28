@@ -7,7 +7,10 @@ import {
   platformFeedSlug,
   SITE_URL,
 } from "./platforms.js";
-import { DEFAULT_REMOTE_MCP_URL } from "./endpoint-url.js";
+import {
+  DEFAULT_REMOTE_MCP_URL,
+  normalizeEndpointUrl,
+} from "./endpoint-url.js";
 import { packageName, packageVersion } from "./package-metadata.js";
 import {
   formatZodError,
@@ -33,6 +36,8 @@ const repoRoot = path.resolve(
 const defaultDataDir = path.join(repoRoot, "apps", "web", "public", "data");
 const safePathPartPattern = /^[a-z0-9-]+$/;
 const jsonMimeType = "application/json";
+const DISCOVERY_RESOURCE_LIMIT = 25;
+const DISCOVERY_FETCH_TIMEOUT_MS = 5000;
 
 export const MCP_PUBLIC_POLICY = {
   apiKeyRequired: false,
@@ -60,6 +65,7 @@ const platformAliases = new Map([
 
 export const READ_ONLY_TOOL_NAMES = [
   "search_registry",
+  "plan_workflow_toolbox",
   "server_info",
   "list_category_entries",
   "get_recent_updates",
@@ -93,6 +99,19 @@ export const TOOL_DEFINITIONS = [
       "Search read-only HeyClaude registry entries by query, category, and skill platform compatibility.",
     inputSchema: jsonSchemaForTool("search_registry"),
     outputSchema: jsonSchemaForToolOutput("search_registry"),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: "plan_workflow_toolbox",
+    description:
+      "Plan a read-only Claude or Codex workflow toolbox from ranked HeyClaude registry entries with trust, install, and follow-up guidance.",
+    inputSchema: jsonSchemaForTool("plan_workflow_toolbox"),
+    outputSchema: jsonSchemaForToolOutput("plan_workflow_toolbox"),
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -346,6 +365,121 @@ function entryMatchesQuery(entry, query) {
   return haystack.includes(query);
 }
 
+function searchTokens(query) {
+  return normalizeText(query)
+    .split(/[^a-z0-9+#.-]+/i)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2)
+    .slice(0, 12);
+}
+
+function entrySearchText(entry) {
+  return [
+    entry.title,
+    entry.description,
+    entry.cardDescription,
+    entry.category,
+    entry.slug,
+    entry.author,
+    entry.submittedBy,
+    entry.brandName,
+    entry.brandDomain,
+    ...notes(entry.safetyNotes),
+    ...notes(entry.privacyNotes),
+    ...(entry.tags || []),
+    ...(entry.keywords || []),
+  ]
+    .map(normalizeText)
+    .join(" ");
+}
+
+function scoreSearchEntry(entry, query) {
+  const normalizedQuery = normalizeText(query);
+  const tokens = searchTokens(normalizedQuery);
+  if (!tokens.length) return { score: 0, reasons: [] };
+
+  const title = normalizeText(entry.title);
+  const category = normalizeText(entry.category);
+  const tags = new Set((entry.tags || []).map(normalizeText));
+  const keywords = new Set((entry.keywords || []).map(normalizeText));
+  const haystack = entrySearchText(entry);
+  const reasons = new Set();
+  let score = 0;
+
+  if (title.includes(normalizedQuery)) {
+    score += 90;
+    reasons.add("title phrase");
+  }
+  if (category === normalizedQuery) {
+    score += 45;
+    reasons.add("category match");
+  }
+
+  for (const token of tokens) {
+    if (title.includes(token)) {
+      score += 35;
+      reasons.add("title term");
+    }
+    if (tags.has(token)) {
+      score += 24;
+      reasons.add("tag match");
+    }
+    if (keywords.has(token)) {
+      score += 18;
+      reasons.add("keyword match");
+    }
+    if (category.includes(token)) {
+      score += 12;
+      reasons.add("category term");
+    }
+    if (haystack.includes(token)) score += 4;
+  }
+
+  if (entrySourceStatus(entry) === "available") {
+    score += 8;
+    reasons.add("source-backed");
+  }
+  if (
+    entryPackageTrust(entry) === "first-party" ||
+    entry.packageVerified ||
+    entry.trustSignals?.packageVerified
+  ) {
+    score += 8;
+    reasons.add("trusted package");
+  }
+  if (notes(entry.safetyNotes).length) {
+    score += 4;
+    reasons.add("safety notes");
+  }
+  if (notes(entry.privacyNotes).length) {
+    score += 4;
+    reasons.add("privacy notes");
+  }
+  if (entry.claimStatus === "verified" || entry.reviewedBy) {
+    score += 4;
+    reasons.add("reviewed");
+  }
+
+  return { score, reasons: [...reasons].slice(0, 6) };
+}
+
+function rankSearchEntries(entries, query) {
+  return entries
+    .map((entry, index) => ({
+      entry,
+      index,
+      ...scoreSearchEntry(entry, query),
+    }))
+    .sort((left, right) => {
+      if (left.score !== right.score) return right.score - left.score;
+      const dateCompare = String(right.entry.dateAdded || "").localeCompare(
+        String(left.entry.dateAdded || ""),
+      );
+      if (dateCompare !== 0) return dateCompare;
+      return left.index - right.index;
+    });
+}
+
 function entryMatchesPlatform(entry, platform) {
   if (!platform) return true;
   return (entry.platforms || []).some((candidate) => candidate === platform);
@@ -435,7 +569,7 @@ function parsedTrustArgs(args = {}) {
   };
 }
 
-function toSearchResult(entry) {
+function toSearchResult(entry, ranking = null) {
   return {
     key: `${entry.category}:${entry.slug}`,
     category: entry.category,
@@ -456,6 +590,8 @@ function toSearchResult(entry) {
       entry.canonicalUrl ||
       entry.url ||
       `${SITE_URL}/${entry.category}/${entry.slug}`,
+    searchScore: ranking?.score ?? 0,
+    searchReasons: ranking?.reasons ?? [],
     trust: entryTrustSummary(entry),
   };
 }
@@ -748,13 +884,14 @@ export async function searchRegistry(args = {}, options = {}) {
     await readJsonArtifact("search-index.json", options),
   );
 
-  const entries = searchIndex
+  const matched = searchIndex
     .filter((entry) => !category || entry.category === category)
     .filter((entry) => entryMatchesPlatform(entry, platform))
     .filter((entry) => entryMatchesQuery(entry, query))
-    .filter((entry) => entryMatchesTrustFilters(entry, trustFilters))
+    .filter((entry) => entryMatchesTrustFilters(entry, trustFilters));
+  const entries = rankSearchEntries(matched, query)
     .slice(0, limit)
-    .map(toSearchResult);
+    .map((item) => toSearchResult(item.entry, item));
 
   return {
     ok: true,
@@ -764,6 +901,104 @@ export async function searchRegistry(args = {}, options = {}) {
     platform: platform || "",
     filters: trustFilters,
     entries,
+  };
+}
+
+function selectDiverseRankedEntries(ranked, limit) {
+  const selected = [];
+  const byCategory = new Map();
+
+  for (const item of ranked) {
+    const category = item.entry.category || "";
+    const current = byCategory.get(category) || 0;
+    if (current >= 2) continue;
+    selected.push(item);
+    byCategory.set(category, current + 1);
+    if (selected.length >= limit) return selected;
+  }
+
+  for (const item of ranked) {
+    if (selected.includes(item)) continue;
+    selected.push(item);
+    if (selected.length >= limit) return selected;
+  }
+
+  return selected;
+}
+
+function toolboxFitReasons(entry, ranking) {
+  const reasons = [...(ranking.reasons || [])];
+  if (entry.installCommand || entry.downloadUrl || entry.configSnippet) {
+    reasons.push("actionable setup surface");
+  }
+  if ((entry.platforms || []).length) {
+    reasons.push("platform compatibility metadata");
+  }
+  return unique(reasons).slice(0, 6);
+}
+
+function toolboxCaveats(entry) {
+  const caveats = [];
+  if (entrySourceStatus(entry) !== "available") {
+    caveats.push("Source metadata is missing or incomplete.");
+  }
+  if (entryPackageTrust(entry) === "external") {
+    caveats.push("Package/download is external; verify upstream before use.");
+  }
+  if (!notes(entry.safetyNotes).length) {
+    caveats.push("No structured safety notes are present.");
+  }
+  if (!notes(entry.privacyNotes).length) {
+    caveats.push("No structured privacy notes are present.");
+  }
+  return caveats.slice(0, 4);
+}
+
+export async function planWorkflowToolbox(args = {}, options = {}) {
+  const goal = String(args.goal || "").trim();
+  const query = normalizeText(goal);
+  const category = normalizeText(args.category);
+  const platform = normalizePlatform(args.platform);
+  const limit = normalizeLimit(args.limit, 6);
+  const searchIndex = unwrapEntries(
+    await readJsonArtifact("search-index.json", options),
+  );
+  const scoped = searchIndex
+    .filter((entry) => !category || entry.category === category)
+    .filter((entry) => entryMatchesPlatform(entry, platform));
+  let matched = scoped.filter((entry) => entryMatchesQuery(entry, query));
+  const queryTokens = searchTokens(query);
+  if (!matched.length && queryTokens.length) {
+    matched = scoped.filter((entry) =>
+      queryTokens.some((token) => entrySearchText(entry).includes(token)),
+    );
+  }
+  const ranked = rankSearchEntries(matched, query);
+  const selected = selectDiverseRankedEntries(ranked, limit).map((item) => ({
+    ...toEntrySummary(item.entry),
+    searchScore: item.score,
+    searchReasons: item.reasons,
+    toolboxReasons: toolboxFitReasons(item.entry, item),
+    caveats: toolboxCaveats(item.entry),
+    nextActions: [
+      `Inspect get_entry_detail with category=${item.entry.category} and slug=${item.entry.slug}.`,
+      `Run explain_entry_trust before copying install or config content.`,
+      `Use compare_entries with nearby candidates before recommending a final stack.`,
+    ],
+  }));
+
+  return {
+    ok: true,
+    goal,
+    category: category || "",
+    platform: platform || "",
+    count: selected.length,
+    entries: selected,
+    plannerNotes: [
+      "This planner ranks public registry metadata only; it does not execute or install entries.",
+      "Prefer source-backed entries with safety/privacy notes for risk-bearing MCP, hooks, skills, commands, and statuslines.",
+      "Use get_copyable_asset only after reviewing trust metadata and upstream source.",
+    ],
   };
 }
 
@@ -1161,7 +1396,18 @@ export async function getRegistryStats(args = {}, options = {}) {
 }
 
 export async function getClientSetup(args = {}) {
-  const endpointUrl = args.endpointUrl || DEFAULT_REMOTE_MCP_URL;
+  let endpointUrl;
+  try {
+    const rawEndpointUrl = Object.prototype.hasOwnProperty.call(
+      args,
+      "endpointUrl",
+    )
+      ? args.endpointUrl
+      : DEFAULT_REMOTE_MCP_URL;
+    endpointUrl = normalizeEndpointUrl(rawEndpointUrl).toString();
+  } catch (error) {
+    return invalid(error?.message || "Invalid endpoint URL.");
+  }
   const snippets = {
     codex: {
       label: "Codex stdio bridge",
@@ -1248,6 +1494,316 @@ export const RESOURCE_TEMPLATES = [
   },
 ];
 
+/**
+ * Static MCP resource descriptors for the bounded discovery surfaces
+ * exposed alongside the directory and category feeds. Appended to
+ * {@link listRegistryResources} output and routed by
+ * {@link readRegistryResource}.
+ *
+ * @type {Array<{ uri: string, name: string, title: string, description: string, mimeType: string }>}
+ */
+const DISCOVERY_RESOURCES = [
+  {
+    uri: "heyclaude://registry/recent",
+    name: "HeyClaude recent registry updates",
+    title: "HeyClaude recent registry updates",
+    description:
+      "Bounded list of recently added or upstream-updated HeyClaude entries from the generated search index.",
+    mimeType: jsonMimeType,
+  },
+  {
+    uri: "heyclaude://registry/trending",
+    name: "HeyClaude trending registry entries",
+    title: "HeyClaude trending registry entries",
+    description:
+      "Bounded list of trending HeyClaude entries from the public /api/registry/trending endpoint; degrades gracefully when dynamic state is unavailable.",
+    mimeType: jsonMimeType,
+  },
+  {
+    uri: "heyclaude://jobs/active",
+    name: "HeyClaude active jobs",
+    title: "HeyClaude active jobs",
+    description:
+      "Bounded list of active public job listings from the public /api/jobs endpoint; degrades gracefully when dynamic state is unavailable.",
+    mimeType: jsonMimeType,
+  },
+];
+
+/**
+ * Resolve the public HeyClaude API base URL. Prefers an explicit override
+ * on `options.publicApiBaseUrl`, then the `HEYCLAUDE_PUBLIC_API_URL`
+ * environment variable, then falls back to the canonical site URL.
+ *
+ * @param {{ publicApiBaseUrl?: string }} [options]
+ * @returns {string} Base URL used to build `/api/...` requests.
+ */
+function publicApiBaseUrl(options = {}) {
+  return (
+    options.publicApiBaseUrl || process.env.HEYCLAUDE_PUBLIC_API_URL || SITE_URL
+  );
+}
+
+/**
+ * Fetch JSON from a public HeyClaude API path. Tests inject a deterministic
+ * fetcher via `options.fetchPublicApi`; production uses `fetch()` with a
+ * bounded {@link DISCOVERY_FETCH_TIMEOUT_MS} timeout, `redirect: "error"`,
+ * and a JSON `accept` header. Throws on non-2xx responses so callers can
+ * convert failures into the "unavailable" graceful-degradation envelope.
+ *
+ * @param {string} apiPath API path beginning with `/api/...`.
+ * @param {{
+ *   publicApiBaseUrl?: string,
+ *   fetchPublicApi?: (apiPath: string) => Promise<unknown>,
+ * }} [options]
+ * @returns {Promise<unknown>} Parsed JSON body from the upstream response.
+ */
+async function fetchPublicApiJson(apiPath, options = {}) {
+  if (typeof options.fetchPublicApi === "function") {
+    return options.fetchPublicApi(apiPath);
+  }
+  const baseUrl = publicApiBaseUrl(options).replace(/\/+$/, "");
+  const url = `${baseUrl}${apiPath.startsWith("/") ? "" : "/"}${apiPath}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    DISCOVERY_FETCH_TIMEOUT_MS,
+  );
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { accept: jsonMimeType },
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Public API ${apiPath} returned ${response.status}.`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Build the standard "unavailable" error envelope used when a dynamic
+ * resource cannot be loaded. Distinct from `notFound` / `invalid` so MCP
+ * clients can tell apart "endpoint failed" from "no such resource" and
+ * keep the surface read-only.
+ *
+ * @param {string} message Human-readable explanation.
+ * @param {string} [details] Optional underlying error message.
+ * @returns {{ ok: false, error: { code: "unavailable", message: string, details?: string } }}
+ */
+function unavailable(message, details) {
+  return {
+    ok: false,
+    error: {
+      code: "unavailable",
+      message,
+      ...(details ? { details } : {}),
+    },
+  };
+}
+
+/**
+ * Build the `heyclaude://registry/recent` resource payload. Reads the
+ * generated `search-index.json` artifact, sorts entries by `repoUpdatedAt`
+ * (falling back to `updatedAt` / `dateAdded`) descending, and bounds
+ * output to {@link DISCOVERY_RESOURCE_LIMIT} entries. Each entry carries
+ * the standard `toEntrySummary` shape plus `updatedAt` and `updateKind`.
+ *
+ * @param {import("./registry.d.ts").RegistryArtifactLoaders} [options]
+ * @returns {Promise<import("./registry.d.ts").RegistryToolResult>}
+ */
+export async function listRegistryRecent(options = {}) {
+  const searchIndex = unwrapEntries(
+    await readJsonArtifact("search-index.json", options),
+  );
+  const entries = searchIndex
+    .slice()
+    .sort((left, right) => {
+      const dateCompare = entryUpdatedAt(right).localeCompare(
+        entryUpdatedAt(left),
+      );
+      if (dateCompare !== 0) return dateCompare;
+      return String(left.title || "").localeCompare(String(right.title || ""));
+    })
+    .slice(0, DISCOVERY_RESOURCE_LIMIT)
+    .map((entry) => ({
+      ...toEntrySummary(entry),
+      updatedAt: entryUpdatedAt(entry),
+      updateKind: entry.repoUpdatedAt ? "upstream_update" : "added",
+    }));
+
+  return {
+    ok: true,
+    kind: "registry-recent",
+    schemaVersion: 1,
+    limit: DISCOVERY_RESOURCE_LIMIT,
+    count: entries.length,
+    entries,
+  };
+}
+
+/**
+ * Normalize a raw `/api/registry/trending` entry into the small, stable
+ * shape published by the MCP `registry/trending` resource. Defends against
+ * upstream field churn (missing arrays, non-numeric scores, dropped
+ * `trustSignals`) so MCP clients see a predictable schema.
+ *
+ * @param {Record<string, unknown> & { category: string, slug: string }} entry
+ * @returns {Record<string, unknown>} Normalized trending entry.
+ */
+function toTrendingEntry(entry) {
+  return {
+    key: `${entry.category}:${entry.slug}`,
+    category: entry.category,
+    slug: entry.slug,
+    title: entry.title || "",
+    description: entry.description || "",
+    canonicalUrl:
+      entry.canonicalUrl || `${SITE_URL}/${entry.category}/${entry.slug}`,
+    platforms: Array.isArray(entry.platforms) ? entry.platforms : [],
+    tags: Array.isArray(entry.tags) ? entry.tags : [],
+    dateAdded: entry.dateAdded || "",
+    score: typeof entry.score === "number" ? entry.score : 0,
+    reasons: Array.isArray(entry.reasons) ? entry.reasons : [],
+    trustSignals: entry.trustSignals || { sourceStatus: "missing" },
+  };
+}
+
+/**
+ * Build the `heyclaude://registry/trending` resource payload. Reuses the
+ * public `/api/registry/trending` endpoint (no DB access from the MCP
+ * package). Returns an `unavailable` envelope when the upstream fetch
+ * fails so MCP clients degrade gracefully. Output is bounded to
+ * {@link DISCOVERY_RESOURCE_LIMIT} entries and forwards `signalsAvailable`
+ * when present so consumers can tell which scoring signals applied.
+ *
+ * @param {import("./registry.d.ts").RegistryArtifactLoaders & {
+ *   publicApiBaseUrl?: string,
+ *   fetchPublicApi?: (apiPath: string) => Promise<unknown>,
+ * }} [options]
+ * @returns {Promise<import("./registry.d.ts").RegistryToolResult>}
+ */
+export async function listRegistryTrending(options = {}) {
+  let payload;
+  try {
+    payload = await fetchPublicApiJson(
+      `/api/registry/trending?limit=${DISCOVERY_RESOURCE_LIMIT}`,
+      options,
+    );
+  } catch (error) {
+    return unavailable(
+      "Trending registry state is currently unavailable.",
+      String(error?.message || error || ""),
+    );
+  }
+
+  if (!payload || !Array.isArray(payload.entries)) {
+    return unavailable(
+      "Trending registry state is currently unavailable.",
+      "Upstream payload is missing the expected entries array.",
+    );
+  }
+  const entries = payload.entries
+    .slice(0, DISCOVERY_RESOURCE_LIMIT)
+    .map(toTrendingEntry);
+
+  return {
+    ok: true,
+    kind: "registry-trending",
+    schemaVersion: payload?.schemaVersion ?? 1,
+    category: payload?.category || "all",
+    platform: payload?.platform || "all",
+    limit: DISCOVERY_RESOURCE_LIMIT,
+    count: entries.length,
+    signalsAvailable:
+      payload?.signalsAvailable && typeof payload.signalsAvailable === "object"
+        ? payload.signalsAvailable
+        : null,
+    source: "public-api",
+    entries,
+  };
+}
+
+/**
+ * Normalize a raw `/api/jobs` entry into the small, stable shape published
+ * by the MCP `jobs/active` resource. Defends against upstream field churn
+ * and never exposes private/admin-only fields (we only project the public
+ * subset already returned by `buildPublicJobsIndex`).
+ *
+ * @param {Record<string, unknown>} job
+ * @returns {Record<string, unknown>} Normalized public job entry.
+ */
+function toJobEntry(job) {
+  return {
+    id: job.id || job.slug || "",
+    title: job.title || "",
+    company: job.company || "",
+    location: job.location || "",
+    type: job.type || "",
+    isRemote: Boolean(job.isRemote),
+    tier: job.tier || "",
+    applyUrl: job.applyUrl || job.url || "",
+    sourceLabel: job.sourceLabel || "",
+    postedAt: job.postedAt || job.publishedAt || "",
+    labels: Array.isArray(job.labels) ? job.labels : [],
+  };
+}
+
+/**
+ * Build the `heyclaude://jobs/active` resource payload. Reuses the public
+ * `/api/jobs` endpoint (no DB access from the MCP package) and returns an
+ * `unavailable` envelope when the upstream fetch fails. Output is bounded
+ * to {@link DISCOVERY_RESOURCE_LIMIT} entries and forwards `totalAvailable`
+ * when the upstream reports it.
+ *
+ * @param {import("./registry.d.ts").RegistryArtifactLoaders & {
+ *   publicApiBaseUrl?: string,
+ *   fetchPublicApi?: (apiPath: string) => Promise<unknown>,
+ * }} [options]
+ * @returns {Promise<import("./registry.d.ts").RegistryToolResult>}
+ */
+export async function listJobsActive(options = {}) {
+  let payload;
+  try {
+    payload = await fetchPublicApiJson(
+      `/api/jobs?limit=${DISCOVERY_RESOURCE_LIMIT}`,
+      options,
+    );
+  } catch (error) {
+    return unavailable(
+      "Active jobs state is currently unavailable.",
+      String(error?.message || error || ""),
+    );
+  }
+
+  if (!payload || !Array.isArray(payload.entries)) {
+    return unavailable(
+      "Active jobs state is currently unavailable.",
+      "Upstream payload is missing the expected entries array.",
+    );
+  }
+  const entries = payload.entries
+    .slice(0, DISCOVERY_RESOURCE_LIMIT)
+    .map(toJobEntry);
+
+  return {
+    ok: true,
+    kind: "jobs-active",
+    schemaVersion: payload?.schemaVersion ?? 1,
+    limit: DISCOVERY_RESOURCE_LIMIT,
+    count: entries.length,
+    totalAvailable:
+      typeof payload?.totalAvailable === "number"
+        ? payload.totalAvailable
+        : null,
+    source: "public-api",
+    entries,
+  };
+}
+
 export const PROMPT_DEFINITIONS = [
   {
     name: "find_best_asset",
@@ -1330,6 +1886,7 @@ export async function listRegistryResources(args = {}, options = {}) {
         description: `Generated public ${category} category summary entries.`,
         mimeType: jsonMimeType,
       })),
+      ...DISCOVERY_RESOURCES,
     ],
   };
 }
@@ -1391,6 +1948,24 @@ export async function readRegistryResource(args = {}, options = {}) {
     const [category, slug] = parts.map(normalizeText);
     const detail = await getEntryDetail({ category, slug }, options);
     payload = detail;
+  } else if (
+    parsed.hostname === "registry" &&
+    parts.length === 1 &&
+    parts[0] === "recent"
+  ) {
+    payload = await listRegistryRecent(options);
+  } else if (
+    parsed.hostname === "registry" &&
+    parts.length === 1 &&
+    parts[0] === "trending"
+  ) {
+    payload = await listRegistryTrending(options);
+  } else if (
+    parsed.hostname === "jobs" &&
+    parts.length === 1 &&
+    parts[0] === "active"
+  ) {
+    payload = await listJobsActive(options);
   } else {
     return resourcePayload(
       notFound(`Unsupported HeyClaude resource URI: ${uri}`),
@@ -1759,6 +2334,9 @@ export async function callRegistryTool(name, args = {}, options = {}) {
   switch (name) {
     case "search_registry":
       result = await searchRegistry(parsedArgs, options);
+      break;
+    case "plan_workflow_toolbox":
+      result = await planWorkflowToolbox(parsedArgs, options);
       break;
     case "server_info":
       result = await getServerInfo(parsedArgs, options);
